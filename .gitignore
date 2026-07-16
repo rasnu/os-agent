@@ -1,0 +1,45 @@
+# =============================================================================
+# RasnuOS Agent — .gitignore
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Compiled binaries — local dev builds (root of repo)
+# -----------------------------------------------------------------------------
+
+# The main agent binary produced by `go build ./cmd/rasnuos-agent`.
+# Anchored to the repo root on purpose: an unanchored `rasnuos-agent` pattern
+# would also ignore the cmd/rasnuos-agent/ SOURCE directory.
+/rasnuos-agent
+/rasnuos-agent-new
+
+# Any platform-specific binary produced locally (not via scripts/build-all.sh)
+/rasnuos-agent-*
+
+# Windows executables produced locally
+*.exe
+*.exe~
+
+# Ad-hoc local build outputs (never commit binaries; releases live on GitHub Releases)
+/agent
+/agent_test
+/agent_test_mac
+/rasnucloud-agent
+/rasnuone-agent
+/test_build
+/test_darwin
+/bin/
+
+# Runtime audit log written by the agent / tests when the OS log dir is unavailable
+audit.jsonl
+
+# Shared libraries
+*.dll
+*.so
+*.dylib
+
+# -----------------------------------------------------------------------------
+# Build script output — binaries produced by build-all.sh
+# -----------------------------------------------------------------------------
+
+# All compiled release binaries go here; never commit them
+/build/
