@@ -1,0 +1,106 @@
+# =============================================================================
+# RasnuOne Agent — .gitignore
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Compiled binaries — local dev builds (root of repo)
+# -----------------------------------------------------------------------------
+
+# The main agent binary produced by `go build .`
+rasnuone-agent
+rasnucloud-agent
+
+# Any platform-specific binary produced locally (not via build-all.sh)
+rasnuone-agent-*
+rasnucloud-agent-*
+
+# Windows executables produced locally
+*.exe
+*.exe~
+
+# Shared libraries
+*.dll
+*.so
+*.dylib
+
+# -----------------------------------------------------------------------------
+# Build script output — binaries produced by build-all.sh
+# -----------------------------------------------------------------------------
+
+# All compiled release binaries go here; never commit them
+build/
+
+# -----------------------------------------------------------------------------
+# Test artifacts
+# -----------------------------------------------------------------------------
+
+# Binaries produced by `go test -c`
+*.test
+
+# os_adapter cross-compilation test binaries
+os_adapter.test.exe
+os_adapter.test
+
+# Coverage reports
+coverage.out
+coverage.html
+
+# Raw test output captured to files during development
+test_out.txt
+test_out2.txt
+*.test_out.txt
+
+# -----------------------------------------------------------------------------
+# Logs
+# -----------------------------------------------------------------------------
+
+# Agent log file written at runtime
+*.log
+rasnuone-agent.log
+rasnucloud-agent.log
+
+# -----------------------------------------------------------------------------
+# Credentials and environment files
+# Never commit tokens, bearer credentials, or environment secrets
+# -----------------------------------------------------------------------------
+
+*.env
+agent.env
+.env.local
+.env.*.local
+
+# -----------------------------------------------------------------------------
+# Go toolchain
+# -----------------------------------------------------------------------------
+
+# Go workspace files (local multi-module dev only)
+go.work
+go.work.sum
+
+# Vendor directory (uncomment if you ever vendor dependencies)
+# vendor/
+
+# -----------------------------------------------------------------------------
+# Editor and OS noise
+# -----------------------------------------------------------------------------
+
+# JetBrains IDEs (GoLand, IntelliJ)
+.idea/
+
+# VS Code
+.vscode/
+
+# macOS Finder metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Vim swap files
+*.swp
+*.swo
+*~
+
+# Windows thumbnail cache
+Thumbs.db
+ehthumbs.db
+Desktop.ini
