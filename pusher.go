@@ -1,5 +1,5 @@
 /**
- * Project: RasnuOne
+ * Project: RasnuOS
  * Copyright © 2026 Rasnu LLC (rasnu.com). All rights reserved.
  */
 package main
@@ -13,7 +13,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"rasnuone-agent/os_adapter"
+	"rasnuos-agent/os_adapter"
 	"regexp"
 	"runtime"
 	"sync"
@@ -84,7 +84,7 @@ func (c *PusherClient) Connect() error {
 	log.Printf("Connecting to %s", c.ServerURL)
 
 	headers := http.Header{}
-	headers.Add("User-Agent", fmt.Sprintf("RasnuOneAgent/%s", version))
+	headers.Add("User-Agent", fmt.Sprintf("RasnuOSAgent/%s", version))
 
 	dialer := websocket.DefaultDialer
 	if c.TLSPin != "" {

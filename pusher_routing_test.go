@@ -1,7 +1,7 @@
 package main
 
 import (
-	"rasnuone-agent/os_adapter"
+	"rasnuos-agent/os_adapter"
 	"testing"
 )
 

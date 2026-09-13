@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"net"
 	"net/http"
 	"time"
 )
@@ -15,12 +17,24 @@ type userAgentRoundTripper struct {
 }
 
 func (rt *userAgentRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Set("User-Agent", "RasnuOneAgent/"+version)
+	req.Header.Set("User-Agent", "RasnuOSAgent/"+version)
 	return rt.inner.RoundTrip(req)
 }
 
 func defaultTransport() http.RoundTripper {
-	return &userAgentRoundTripper{inner: http.DefaultTransport}
+	baseTransport := http.DefaultTransport.(*http.Transport).Clone()
+	
+	// Force IPv4 for all agent outgoing requests to avoid broken IPv6 routes on customer VPSs
+	// which commonly cause 10s timeouts when dialing Cloudflare AAAA records.
+	baseTransport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		dialer := &net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}
+		return dialer.DialContext(ctx, "tcp4", addr)
+	}
+
+	return &userAgentRoundTripper{inner: baseTransport}
 }
 
 var (

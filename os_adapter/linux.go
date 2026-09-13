@@ -120,7 +120,7 @@ func (a *LinuxAdapter) StartPTY(cols, rows uint16) (PTY, error) {
 func (a *LinuxAdapter) InstallService(executablePath string) error {
 	// Implementation for installing systemd service
 	serviceContent := fmt.Sprintf(`[Unit]
-Description=RasnuCloud Agent
+Description=RasnuOS Agent
 After=network.target
 
 [Service]
@@ -134,20 +134,20 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 `, executablePath)
 
-	err := os.WriteFile("/etc/systemd/system/rasnucloud-agent.service", []byte(serviceContent), 0644)
+	err := os.WriteFile("/etc/systemd/system/rasnuos-agent.service", []byte(serviceContent), 0644)
 	if err != nil {
 		return err
 	}
 
 	exec.Command("systemctl", "daemon-reload").Run()
-	exec.Command("systemctl", "enable", "rasnucloud-agent").Run()
-	return exec.Command("systemctl", "start", "rasnucloud-agent").Run()
+	exec.Command("systemctl", "enable", "rasnuos-agent").Run()
+	return exec.Command("systemctl", "start", "rasnuos-agent").Run()
 }
 
 func (a *LinuxAdapter) UninstallService() error {
-	exec.Command("systemctl", "stop", "rasnucloud-agent").Run()
-	exec.Command("systemctl", "disable", "rasnucloud-agent").Run()
-	err := os.Remove("/etc/systemd/system/rasnucloud-agent.service")
+	exec.Command("systemctl", "stop", "rasnuos-agent").Run()
+	exec.Command("systemctl", "disable", "rasnuos-agent").Run()
+	err := os.Remove("/etc/systemd/system/rasnuos-agent.service")
 	if err != nil {
 		return err
 	}
@@ -344,4 +344,19 @@ func getServiceStatuses() ([]ServiceStatus, error) {
 		}
 	}
 	return statuses, nil
+}
+
+func (a *LinuxAdapter) PunchFirewallHole(port int) error {
+	// Ignore errors since ufw or iptables might not be installed
+	portStr := fmt.Sprintf("%d", port)
+	exec.Command("ufw", "allow", fmt.Sprintf("%s/tcp", portStr)).Run()
+	exec.Command("iptables", "-I", "INPUT", "-p", "tcp", "--dport", portStr, "-j", "ACCEPT").Run()
+	return nil
+}
+
+func (a *LinuxAdapter) CloseFirewallHole(port int) error {
+	portStr := fmt.Sprintf("%d", port)
+	exec.Command("ufw", "delete", "allow", fmt.Sprintf("%s/tcp", portStr)).Run()
+	exec.Command("iptables", "-D", "INPUT", "-p", "tcp", "--dport", portStr, "-j", "ACCEPT").Run()
+	return nil
 }

@@ -1,5 +1,5 @@
 /**
- * Project: RasnuOne
+ * Project: RasnuOS
  * Copyright © 2026 Rasnu LLC (rasnu.com). All rights reserved.
  */
 package main
@@ -15,10 +15,11 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
-	"rasnuone-agent/os_adapter"
+	"rasnuos-agent/os_adapter"
 )
 
 // secretPatterns mask likely credential values (mysql -p, --password, redis-cli -a, and
@@ -159,7 +160,7 @@ func (c *PusherClient) executeAndStream(pipelineId string, stepId string, comman
 	if f, err := os.OpenFile(os_adapter.Current().LogFilePath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600); err == nil {
 		f.WriteString(fmt.Sprintf("[%s] EXEC: %s\n", time.Now().Format(time.RFC3339), safeCommand))
 		f.Close()
-	} else if f, err := os.OpenFile("rasnuone-agent.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600); err == nil {
+	} else if f, err := os.OpenFile("rasnuos-agent.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600); err == nil {
 		f.WriteString(fmt.Sprintf("[%s] EXEC: %s\n", time.Now().Format(time.RFC3339), safeCommand))
 		f.Close()
 	}
@@ -181,6 +182,19 @@ func (c *PusherClient) executeAndStream(pipelineId string, stepId string, comman
 	}()
 
 	cmd := os_adapter.Current().GetShellCmd(ctx, command, runAsUser)
+
+	// --- PILLAR 3: Zero-Trust Secret Injection ---
+	// If there are secrets stored under this stepId token scope, inject them
+	// as environment variables for this command ONLY. They are wiped after retrieval.
+	// We use stepId as the scope token so that secrets only apply to the exact next step.
+	injectedEnv, injectedKeys := buildEnvWithSecrets(stepId, os.Environ())
+	if len(injectedKeys) > 0 {
+		cmd.Env = injectedEnv
+		safeKeyList := fmt.Sprintf("%v", injectedKeys)
+		c.streamLogWS(pipelineId, stepId, fmt.Sprintf("\n[VAULT] Injecting %d secret(s) from secure RAM store: %s = ***REDACTED***\n", len(injectedKeys), safeKeyList), nil)
+		log.Printf("[VAULT] Injected env vars for step %s: %v", stepId, injectedKeys)
+	}
+	// -------------------------------------------
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -235,13 +249,39 @@ func (c *PusherClient) readStream(stepId string, reader io.Reader, batcher *Stre
 
 	scanner := bufio.NewScanner(reader)
 
+	// Custom split function to split on both \n and \r for live rsync progress
+	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+		if atEOF && len(data) == 0 {
+			return 0, nil, nil
+		}
+		if i := bytes.IndexAny(data, "\r\n"); i >= 0 {
+			return i + 1, data[0 : i+1], nil
+		}
+		if atEOF {
+			return len(data), data, nil
+		}
+		return 0, nil, nil
+	})
+
 	// Increase scanner buffer to 1MB to handle very long lines (e.g. base64 output)
 	const maxCapacity = 1024 * 1024
 	buf := make([]byte, 64*1024) // Initial size 64KB
 	scanner.Buffer(buf, maxCapacity)
 
+	var prependCR bool
 	for scanner.Scan() {
-		text := scanner.Text() + "\n"
+		text := scanner.Text()
+
+		if prependCR {
+			text = "\r" + text
+			prependCR = false
+		}
+
+		if strings.HasSuffix(text, "\r") {
+			prependCR = true
+			text = strings.TrimSuffix(text, "\r")
+		}
+
 		batcher.Write(text)
 	}
 

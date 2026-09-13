@@ -4,7 +4,7 @@ import (
 	"context"
 	"os/exec"
 
-	"rasnuone-agent/os_adapter"
+	"rasnuos-agent/os_adapter"
 )
 
 type MockPTY struct {
@@ -140,7 +140,7 @@ func (m *MockOSAdapter) WriteCronJobs(content string) error {
 }
 
 func (m *MockOSAdapter) LogFilePath() string {
-	return "rasnuone-agent.log"
+	return "rasnuos-agent.log"
 }
 
 func SetupMockAdapter() *MockOSAdapter {

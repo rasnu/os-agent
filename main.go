@@ -1,5 +1,5 @@
 /**
- * Project: RasnuOne
+ * Project: RasnuOS
  * Copyright © 2026 Rasnu LLC (rasnu.com). All rights reserved.
  */
 package main
@@ -13,7 +13,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"rasnuone-agent/os_adapter"
+	"rasnuos-agent/os_adapter"
 
 	"gopkg.in/natefinch/lumberjack.v2"
 )
@@ -24,7 +24,7 @@ var version = "dev"
 
 // firstNonEmpty prefers an explicit CLI flag but falls back to the environment so that
 // production installs can source secrets from a chmod-600 EnvironmentFile instead of
-// exposing them in `ps aux` (CLI args) — see deploy/rasnuone-agent.service.
+// exposing them in `ps aux` (CLI args) — see deploy/rasnuos-agent.service.
 func firstNonEmpty(flagValue string, envKeys ...string) string {
 	if flagValue != "" {
 		return flagValue
@@ -59,10 +59,10 @@ func buildServerURL(flagValue string) string {
 	}
 	appKey := firstNonEmpty("", "REVERB_APP_KEY")
 	if appKey == "" {
-		appKey = "rasnuone-key"
+		appKey = "rasnuos-key"
 	}
 
-	return fmt.Sprintf("%s://%s:%s/app/%s?protocol=7&client=rasnuone-agent&version=1.0.0", scheme, host, port, appKey)
+	return fmt.Sprintf("%s://%s:%s/app/%s?protocol=7&client=rasnuos-agent&version=1.0.0", scheme, host, port, appKey)
 }
 
 func run(args []string) error {
@@ -79,11 +79,11 @@ func run(args []string) error {
 		log.SetOutput(multiWriter)
 	}
 
-	fs := flag.NewFlagSet("rasnuone-agent", flag.ContinueOnError)
+	fs := flag.NewFlagSet("rasnuos-agent", flag.ContinueOnError)
 	serverURLFlag := fs.String("server", "", "Reverb WebSocket URL (falls back to REVERB_SCHEME/REVERB_HOST/REVERB_PORT/REVERB_APP_KEY env vars)")
-	apiURLFlag := fs.String("api", "", "RasnuOne Laravel API URL (falls back to API_URL env var)")
+	apiURLFlag := fs.String("api", "", "RasnuOS Laravel API URL (falls back to API_URL env var)")
 	tokenFlag := fs.String("token", "", "Agent Authentication Token")
-	serverIdFlag := fs.String("server-id", "", "ID of the Server in RasnuOne")
+	serverIdFlag := fs.String("server-id", "", "ID of the Server in RasnuOS")
 	tlsPinFlag := fs.String("tls-pin", "", "Comma-separated list of SHA-256 SPKI hashes for TLS certificate pinning (falls back to TLS_PIN env var)")
 	versionFlag := fs.Bool("version", false, "Print version and exit")
 
@@ -92,7 +92,7 @@ func run(args []string) error {
 	}
 
 	if *versionFlag {
-		fmt.Printf("rasnuone-agent %s\n", version)
+		fmt.Printf("rasnuos-agent %s\n", version)
 		return nil
 	}
 
@@ -109,7 +109,7 @@ func run(args []string) error {
 		return fmt.Errorf("--token/--server-id (or BEARER_TOKEN/SERVER_ID env vars) are required")
 	}
 
-	log.Printf("Starting RasnuOne Agent %s", version)
+	log.Printf("Starting RasnuOS Agent %s", version)
 	log.Printf("Target Server ID: %s", serverId)
 
 	if tlsPin != "" {

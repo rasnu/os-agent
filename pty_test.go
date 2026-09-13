@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"rasnuone-agent/os_adapter"
+	"rasnuos-agent/os_adapter"
 )
 
 func TestStartTerminal(t *testing.T) {

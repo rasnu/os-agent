@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"rasnuone-agent/os_adapter"
+	"rasnuos-agent/os_adapter"
 )
 
 func TestExecuteSelfUpdate(t *testing.T) {

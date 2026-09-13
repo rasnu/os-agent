@@ -53,7 +53,7 @@ func (m *MockAdapter) WriteCronJobs(content string) error {
 }
 
 func (m *MockAdapter) LogFilePath() string {
-	return "rasnuone-agent.log"
+	return "rasnuos-agent.log"
 }
 
 func TestCurrentPanicsWhenNil(t *testing.T) {

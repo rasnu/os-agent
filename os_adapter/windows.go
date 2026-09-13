@@ -127,13 +127,13 @@ func (a *WindowsAdapter) StartPTY(cols, rows uint16) (PTY, error) {
 
 func (a *WindowsAdapter) InstallService(executablePath string) error {
 	// In Windows, installing as a service typically uses New-Service
-	psCmd := fmt.Sprintf(`New-Service -Name "RasnuCloudAgent" -BinaryPathName "%s" -DisplayName "RasnuCloud Agent" -StartupType Automatic`, executablePath)
+	psCmd := fmt.Sprintf(`New-Service -Name "RasnuOSAgent" -BinaryPathName "%s" -DisplayName "RasnuOS Agent" -StartupType Automatic`, executablePath)
 	return exec.Command("powershell", "-NoProfile", "-Command", psCmd).Run()
 }
 
 func (a *WindowsAdapter) UninstallService() error {
-	exec.Command("powershell", "-NoProfile", "-Command", `Stop-Service -Name "RasnuCloudAgent"`).Run()
-	return exec.Command("powershell", "-NoProfile", "-Command", `Remove-Service -Name "RasnuCloudAgent"`).Run()
+	exec.Command("powershell", "-NoProfile", "-Command", `Stop-Service -Name "RasnuOSAgent"`).Run()
+	return exec.Command("powershell", "-NoProfile", "-Command", `Remove-Service -Name "RasnuOSAgent"`).Run()
 }
 
 type WindowsPTY struct {
@@ -308,4 +308,18 @@ func getServiceStatuses() ([]ServiceStatus, error) {
 	}
 
 	return statuses, nil
+}
+
+func (a *WindowsAdapter) PunchFirewallHole(port int) error {
+	portStr := fmt.Sprintf("%d", port)
+	ruleName := fmt.Sprintf("RasnuOS Agent Port %s", portStr)
+	exec.Command("netsh", "advfirewall", "firewall", "add", "rule", fmt.Sprintf("name=%s", ruleName), "dir=in", "action=allow", "protocol=TCP", fmt.Sprintf("localport=%s", portStr)).Run()
+	return nil
+}
+
+func (a *WindowsAdapter) CloseFirewallHole(port int) error {
+	portStr := fmt.Sprintf("%d", port)
+	ruleName := fmt.Sprintf("RasnuOS Agent Port %s", portStr)
+	exec.Command("netsh", "advfirewall", "firewall", "delete", "rule", fmt.Sprintf("name=%s", ruleName)).Run()
+	return nil
 }

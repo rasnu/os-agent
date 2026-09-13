@@ -20,8 +20,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
+
+	"rasnuos-agent/os_adapter"
 )
 
 type MigrationServer struct {
@@ -40,7 +43,7 @@ func (c *PusherClient) handleMigrationCommand(action string, args map[string]int
 	targetPath := getString(args, "path")
 	token := getString(args, "token")
 
-	if pipelineId == "" || stepId == "" || mode == "" || targetPath == "" || token == "" {
+	if pipelineId == "" || stepId == "" || token == "" {
 		log.Printf("Migration command missing required arguments")
 		if stepId != "" {
 			c.sendMigrationCompletion(pipelineId, stepId, false, "Migration command missing required arguments", nil)
@@ -75,6 +78,28 @@ func (c *PusherClient) handleMigrationCommand(action string, args map[string]int
 	case "stop-migration-receiver":
 		shutdownMigrationServer(token)
 		c.sendMigrationCompletion(pipelineId, stepId, true, "Migration receiver stopped", nil)
+	case "prepare-p2p-receiver":
+		portF, ok := args["port"].(float64)
+		port := 0
+		if ok { port = int(portF) }
+		receiveCmd := getString(args, "receive_command")
+		c.prepareP2pReceiver(pipelineId, stepId, receiveCmd, token, port)
+	case "run-p2p-sender":
+		host := getString(args, "host")
+		portF, ok := args["port"].(float64)
+		port := 0
+		if ok { port = int(portF) }
+		fingerprint := getString(args, "fingerprint")
+		sendCmd := getString(args, "send_command")
+		c.runP2pSender(pipelineId, stepId, sendCmd, host, port, fingerprint, token)
+	case "stop-p2p-receiver":
+		shutdownMigrationServer(token)
+		c.sendMigrationCompletion(pipelineId, stepId, true, "P2P receiver stopped", nil)
+	case "inject-secret":
+		// Pillar 3: Zero-Trust in-RAM secret injection.
+		// SECURITY: secrets are stored in process RAM only, never written to disk.
+		// The token arg here is the secret scope key, NOT the agent auth token.
+		c.handleInjectSecret(pipelineId, stepId, args)
 	default:
 		c.sendMigrationCompletion(pipelineId, stepId, false, "Unknown migration action", nil)
 	}
@@ -101,7 +126,7 @@ func (c *PusherClient) prepareMigrationReceiver(pipelineId, stepId, targetPath, 
 
 	// 3. Write secrets file
 	secretsFile := filepath.Join(os.TempDir(), fmt.Sprintf("rsyncd_%s.secrets", token))
-	err = os.WriteFile(secretsFile, []byte(fmt.Sprintf("rasnuone:%s\n", rsyncPassword)), 0600)
+	err = os.WriteFile(secretsFile, []byte(fmt.Sprintf("rasnuos:%s\n", rsyncPassword)), 0600)
 	if err != nil {
 		c.sendMigrationCompletion(pipelineId, stepId, false, fmt.Sprintf("Failed to write secrets: %v", err), nil)
 		return
@@ -137,7 +162,7 @@ lock file = %s
 log file = %s
 [migration]
 path = /
-auth users = rasnuone
+auth users = rasnuos
 secrets file = %s
 `, localRsyncPort, uidGidConfig, pidFile, lockFile, logFile, secretsFile)
 
@@ -164,6 +189,9 @@ secrets file = %s
 		return
 	}
 	publicPort := listener.Addr().(*net.TCPAddr).Port
+
+	// Punch hole in local firewalls using OS Adapter
+	os_adapter.Current().PunchFirewallHole(publicPort)
 
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{*cert},
@@ -216,6 +244,10 @@ func shutdownMigrationServer(token string) {
 	if val, ok := activeMigrationServers.Load(token); ok {
 		ms := val.(*MigrationServer)
 		ms.listener.Close()
+
+		// Clean up firewall rules
+		os_adapter.Current().CloseFirewallHole(ms.port)
+
 		if ms.cmd != nil && ms.cmd.Process != nil {
 			ms.cmd.Process.Kill()
 		}
@@ -262,7 +294,10 @@ func (c *PusherClient) executeMigrationSender(pipelineId, stepId, mode, sourcePa
 					},
 				}
 
-				remoteConn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", host, port), tlsConfig)
+				dialer := &net.Dialer{
+					Timeout: 10 * time.Second,
+				}
+				remoteConn, err := tls.DialWithDialer(dialer, "tcp", net.JoinHostPort(host, strconv.Itoa(port)), tlsConfig)
 				if err != nil {
 					log.Printf("Failed to connect to remote mTLS server: %v", err)
 					return
@@ -276,9 +311,9 @@ func (c *PusherClient) executeMigrationSender(pipelineId, stepId, mode, sourcePa
 	// 3. Execute rsync client with Retry Loop
 	var rsyncArgs []string
 	if mode == "push" {
-		rsyncArgs = []string{"-avz", "--progress", sourcePath, fmt.Sprintf("rsync://rasnuone@127.0.0.1:%d/migration%s", localPort, targetPath)}
+		rsyncArgs = []string{"-avz", "--progress", sourcePath, fmt.Sprintf("rsync://rasnuos@127.0.0.1:%d/migration%s", localPort, targetPath)}
 	} else {
-		rsyncArgs = []string{"-avz", "--progress", fmt.Sprintf("rsync://rasnuone@127.0.0.1:%d/migration%s", localPort, sourcePath), targetPath}
+		rsyncArgs = []string{"-avz", "--progress", fmt.Sprintf("rsync://rasnuos@127.0.0.1:%d/migration%s", localPort, sourcePath), targetPath}
 	}
 
 	var out bytes.Buffer
@@ -287,11 +322,39 @@ func (c *PusherClient) executeMigrationSender(pipelineId, stepId, mode, sourcePa
 		cmd := execCommand("rsync", rsyncArgs...)
 		cmd.Env = append(os.Environ(), fmt.Sprintf("RSYNC_PASSWORD=%s", rsyncPassword))
 
-		out.Reset()
-		cmd.Stdout = io.MultiWriter(&out, os.Stdout)
-		cmd.Stderr = io.MultiWriter(&out, os.Stderr)
+		stdout, pipeErr := cmd.StdoutPipe()
+		if pipeErr != nil {
+			c.sendMigrationCompletion(pipelineId, stepId, false, fmt.Sprintf("Error creating stdout pipe: %v", pipeErr), nil)
+			return
+		}
 
-		err = cmd.Run()
+		stderr, pipeErr := cmd.StderrPipe()
+		if pipeErr != nil {
+			c.sendMigrationCompletion(pipelineId, stepId, false, fmt.Sprintf("Error creating stderr pipe: %v", pipeErr), nil)
+			return
+		}
+
+		if startErr := cmd.Start(); startErr != nil {
+			log.Printf("Rsync attempt %d failed to start: %v", attempt, startErr)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		logBuf := &LogBuffer{}
+		batcher := NewStreamBatcher(c, pipelineId, stepId, logBuf)
+
+		var streamWg sync.WaitGroup
+		streamWg.Add(2)
+
+		go c.readStream(stepId, stdout, batcher, &streamWg)
+		go c.readStream(stepId, stderr, batcher, &streamWg)
+
+		streamWg.Wait()
+		err = cmd.Wait()
+		batcher.Close()
+
+		out.WriteString(logBuf.String())
+
 		if err == nil {
 			break // Success!
 		}
@@ -330,7 +393,7 @@ func generateSelfSignedCert() (*tls.Certificate, interface{}, error) {
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"RasnuOne Temporary Migration"},
+			Organization: []string{"RasnuOS Temporary Migration"},
 		},
 		NotBefore:             notBefore,
 		NotAfter:              notAfter,
@@ -376,4 +439,221 @@ func (c *PusherClient) sendMigrationCompletion(pipelineId, stepId string, succes
 		body, _ := io.ReadAll(resp.Body)
 		log.Printf("Webhook error [%d]: %s", resp.StatusCode, string(body))
 	}
+}
+
+// ---------------------------------------------------------
+// P2P STREAM RECEIVER (mTLS Tunnel)
+// ---------------------------------------------------------
+func (c *PusherClient) prepareP2pReceiver(pipelineId, stepId, receiveCmd, token string, requestedPort int) {
+	cert, _, err := generateSelfSignedCert()
+	if err != nil {
+		c.sendMigrationCompletion(pipelineId, stepId, false, fmt.Sprintf("Failed to generate cert: %v", err), nil)
+		return
+	}
+	hash := sha256.Sum256(cert.Certificate[0])
+	fingerprint := hex.EncodeToString(hash[:])
+
+	addr := fmt.Sprintf("0.0.0.0:%d", requestedPort)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		c.sendMigrationCompletion(pipelineId, stepId, false, fmt.Sprintf("Failed to start listener on %s: %v", addr, err), nil)
+		return
+	}
+	publicPort := listener.Addr().(*net.TCPAddr).Port
+
+	os_adapter.Current().PunchFirewallHole(publicPort)
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{*cert},
+	}
+	tlsListener := tls.NewListener(listener, tlsConfig)
+
+	ms := &MigrationServer{
+		listener:    tlsListener,
+		fingerprint: fingerprint,
+		port:        publicPort,
+		cmd:         nil,
+	}
+	activeMigrationServers.Store(token, ms)
+
+	go func() {
+		defer shutdownMigrationServer(token)
+
+		// Wait for one connection
+		conn, err := tlsListener.Accept()
+		if err != nil {
+			log.Printf("P2P listener error or closed: %v", err)
+			return
+		}
+		defer conn.Close()
+
+		// 1. Enterprise Security: Token-Based Pre-Authentication
+		// We read exactly 64 bytes to verify the incoming connection is authorized
+		tokenBuf := make([]byte, 64)
+		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+		if _, err := io.ReadFull(conn, tokenBuf); err != nil {
+			log.Printf("P2P auth failed (did not receive token): %v", err)
+			return
+		}
+		conn.SetReadDeadline(time.Time{}) // Reset deadline
+
+		if string(tokenBuf) != token {
+			log.Printf("P2P auth failed: Invalid token received")
+			return
+		}
+
+		// Execute the receive command
+		cmd := execCommand("sh", "-c", receiveCmd)
+		ms.cmd = cmd
+
+		// Pipe the network connection directly into cmd.Stdin
+		cmd.Stdin = conn
+		cmd.Stdout = conn
+		
+		// 2. Enterprise Observability: Pipe Receiver's Stderr back to WS safely using StreamBatcher
+		stderrPipe, err := cmd.StderrPipe()
+		if err == nil {
+			batcher := NewStreamBatcher(c, pipelineId, stepId, nil)
+			var streamWg sync.WaitGroup
+			streamWg.Add(1)
+			go func() {
+				defer batcher.Close()
+				c.readStream(stepId, stderrPipe, batcher, &streamWg)
+			}()
+		}
+
+		if err := cmd.Start(); err != nil {
+			log.Printf("Failed to start receive command: %v", err)
+			return
+		}
+
+		cmd.Wait()
+	}()
+
+	// Fail-safe: Hard timeout after 4 hours
+	go func() {
+		time.Sleep(4 * time.Hour)
+		shutdownMigrationServer(token)
+	}()
+
+	data := map[string]interface{}{
+		"port":        publicPort,
+		"fingerprint": fingerprint,
+	}
+	c.sendMigrationCompletion(pipelineId, stepId, true, "P2P Receiver ready", data)
+}
+
+// ---------------------------------------------------------
+// P2P STREAM SENDER (mTLS Client)
+// ---------------------------------------------------------
+type progressWriter struct {
+	pipelineId string
+	stepId     string
+	client     *PusherClient
+	totalBytes int64
+	lastReport time.Time
+}
+
+func (pw *progressWriter) Write(p []byte) (int, error) {
+	n := len(p)
+	pw.totalBytes += int64(n)
+	now := time.Now()
+	if now.Sub(pw.lastReport) > time.Second {
+		pw.lastReport = now
+		mb := float64(pw.totalBytes) / 1024.0 / 1024.0
+		msg := fmt.Sprintf("\rStreaming P2P Data... Transferred: %.2f MB", mb)
+		pw.client.streamLogHTTP(pw.pipelineId, pw.stepId, msg)
+	}
+	return n, nil
+}
+
+func (c *PusherClient) runP2pSender(pipelineId, stepId, sendCmd, host string, port int, fingerprint, token string) {
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,
+		VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+			if len(rawCerts) == 0 {
+				return fmt.Errorf("no certificates provided")
+			}
+			hash := sha256.Sum256(rawCerts[0])
+			certFingerprint := hex.EncodeToString(hash[:])
+			if certFingerprint != fingerprint {
+				return fmt.Errorf("certificate fingerprint mismatch")
+			}
+			return nil
+		},
+	}
+
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	remoteConn, err := tls.DialWithDialer(dialer, "tcp", net.JoinHostPort(host, strconv.Itoa(port)), tlsConfig)
+	if err != nil {
+		c.sendMigrationCompletion(pipelineId, stepId, false, fmt.Sprintf("Failed to dial P2P receiver: %v", err), nil)
+		return
+	}
+	defer remoteConn.Close()
+
+	// 1. Enterprise Security: Authenticate with the Receiver by sending the 64-byte token
+	if len(token) != 64 {
+		c.sendMigrationCompletion(pipelineId, stepId, false, "Invalid P2P token length", nil)
+		return
+	}
+	if _, err := remoteConn.Write([]byte(token)); err != nil {
+		c.sendMigrationCompletion(pipelineId, stepId, false, fmt.Sprintf("Failed to send P2P token: %v", err), nil)
+		return
+	}
+
+	cmd := execCommand("sh", "-c", sendCmd)
+	
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		c.sendMigrationCompletion(pipelineId, stepId, false, fmt.Sprintf("Failed to get stdout pipe: %v", err), nil)
+		return
+	}
+
+	stderrPipe, _ := cmd.StderrPipe()
+	
+	batcher := NewStreamBatcher(c, pipelineId, stepId, nil)
+	var streamWg sync.WaitGroup
+
+	streamWg.Add(1)
+	go c.readStream(stepId, stderrPipe, batcher, &streamWg)
+
+	if err := cmd.Start(); err != nil {
+		c.sendMigrationCompletion(pipelineId, stepId, false, fmt.Sprintf("Failed to start send command: %v", err), nil)
+		return
+	}
+
+	pw := &progressWriter{
+		pipelineId: pipelineId,
+		stepId:     stepId,
+		client:     c,
+		lastReport: time.Now(),
+	}
+
+	go func() {
+		mw := io.MultiWriter(remoteConn, pw)
+		io.Copy(mw, stdoutPipe)
+	}()
+
+	// 3. Enterprise Observability & Dead-lock Prevention:
+	// Read the Receiver's output from the mTLS tunnel to prevent TCP buffer full (dead-lock)
+	// and stream it back to the UI securely using StreamBatcher.
+	streamWg.Add(1)
+	go c.readStream(stepId, remoteConn, batcher, &streamWg)
+
+	go func() {
+		streamWg.Wait()
+		batcher.Close()
+	}()
+
+	// 2. Enterprise Observability: Enforce strict cmd.Wait() error checking
+	if err := cmd.Wait(); err != nil {
+		c.streamLogHTTP(pipelineId, stepId, fmt.Sprintf("\r\nP2P Sender Command Failed: %v\n", err))
+		c.sendMigrationCompletion(pipelineId, stepId, false, fmt.Sprintf("P2P sender execution failed: %v", err), nil)
+		return
+	}
+
+	mb := float64(pw.totalBytes) / 1024.0 / 1024.0
+	c.streamLogHTTP(pipelineId, stepId, fmt.Sprintf("\r\nCompleted P2P Transfer: %.2f MB\n", mb))
+
+	c.sendMigrationCompletion(pipelineId, stepId, true, "P2P sender execution complete", nil)
 }

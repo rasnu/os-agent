@@ -59,6 +59,10 @@ type OSAdapter interface {
 
 	// Paths
 	LogFilePath() string
+
+	// Firewall
+	PunchFirewallHole(port int) error
+	CloseFirewallHole(port int) error
 }
 
 var currentAdapter OSAdapter

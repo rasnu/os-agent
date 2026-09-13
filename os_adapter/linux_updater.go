@@ -38,7 +38,7 @@ func (a *LinuxAdapter) KillProcess(pid string) (string, error) {
 }
 
 func (a *LinuxAdapter) WriteCronJobs(content string) error {
-	err := os.WriteFile("/etc/cron.d/rasnuone-jobs", []byte(content), 0644)
+	err := os.WriteFile("/etc/cron.d/rasnuos-jobs", []byte(content), 0644)
 	if err != nil {
 		return err
 	}
@@ -46,5 +46,5 @@ func (a *LinuxAdapter) WriteCronJobs(content string) error {
 }
 
 func (a *LinuxAdapter) LogFilePath() string {
-	return "/var/log/rasnuone-agent.log"
+	return "/var/log/rasnuos-agent.log"
 }

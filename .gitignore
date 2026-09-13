@@ -1,5 +1,5 @@
 # =============================================================================
-# RasnuOne Agent — .gitignore
+# RasnuOS Agent — .gitignore
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -7,12 +7,12 @@
 # -----------------------------------------------------------------------------
 
 # The main agent binary produced by `go build .`
-rasnuone-agent
-rasnucloud-agent
+rasnuos-agent
+rasnuos-agent
 
 # Any platform-specific binary produced locally (not via build-all.sh)
-rasnuone-agent-*
-rasnucloud-agent-*
+rasnuos-agent-*
+rasnuos-agent-*
 
 # Windows executables produced locally
 *.exe
@@ -56,8 +56,8 @@ test_out2.txt
 
 # Agent log file written at runtime
 *.log
-rasnuone-agent.log
-rasnucloud-agent.log
+rasnuos-agent.log
+rasnuos-agent.log
 
 # -----------------------------------------------------------------------------
 # Credentials and environment files

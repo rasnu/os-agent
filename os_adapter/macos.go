@@ -106,7 +106,7 @@ func (a *MacOSAdapter) InstallService(executablePath string) error {
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.rasnucloud.agent</string>
+    <string>com.rasnuos.agent</string>
     <key>ProgramArguments</key>
     <array>
         <string>%s</string>
@@ -118,7 +118,7 @@ func (a *MacOSAdapter) InstallService(executablePath string) error {
 </dict>
 </plist>`, executablePath)
 
-	plistPath := "/Library/LaunchDaemons/com.rasnucloud.agent.plist"
+	plistPath := "/Library/LaunchDaemons/com.rasnuos.agent.plist"
 	err := os.WriteFile(plistPath, []byte(plistContent), 0644)
 	if err != nil {
 		return err
@@ -128,7 +128,7 @@ func (a *MacOSAdapter) InstallService(executablePath string) error {
 }
 
 func (a *MacOSAdapter) UninstallService() error {
-	plistPath := "/Library/LaunchDaemons/com.rasnucloud.agent.plist"
+	plistPath := "/Library/LaunchDaemons/com.rasnuos.agent.plist"
 	exec.Command("launchctl", "unload", "-w", plistPath).Run()
 	return os.Remove(plistPath)
 }
@@ -277,4 +277,13 @@ func getServiceStatuses() ([]ServiceStatus, error) {
 		})
 	}
 	return statuses, nil
+}
+
+func (a *MacOSAdapter) PunchFirewallHole(port int) error {
+	// macOS application firewall handles this via GUI prompts for the binary
+	return nil
+}
+
+func (a *MacOSAdapter) CloseFirewallHole(port int) error {
+	return nil
 }

@@ -1,4 +1,4 @@
-module rasnuone-agent
+module rasnuos-agent
 
 go 1.21
 

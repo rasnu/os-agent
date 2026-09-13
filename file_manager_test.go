@@ -31,7 +31,7 @@ func TestHandleFileCommand(t *testing.T) {
 	}
 
 	// Create a temporary directory for file operations
-	tempDir, err := os.MkdirTemp("", "rasnuone_file_test")
+	tempDir, err := os.MkdirTemp("", "rasnuos_file_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestHandleFileCommand(t *testing.T) {
 		"pipeline_id": "pipe-1",
 		"step_id":     "step-1",
 		"path":        testFilePath,
-		"content":     base64.StdEncoding.EncodeToString([]byte("hello rasnuone")),
+		"content":     base64.StdEncoding.EncodeToString([]byte("hello rasnuos")),
 		"mode":        "0600",
 	}
 	client.handleFileCommand("write-file", writeArgs)
@@ -56,7 +56,7 @@ func TestHandleFileCommand(t *testing.T) {
 
 	// Verify file was written and mode was respected
 	content, _ := os.ReadFile(testFilePath)
-	if string(content) != "hello rasnuone" {
+	if string(content) != "hello rasnuos" {
 		t.Errorf("write-file content mismatch. Got: %s", string(content))
 	}
 	info, _ := os.Stat(testFilePath)
@@ -76,7 +76,7 @@ func TestHandleFileCommand(t *testing.T) {
 	if success, ok := lastReqBody["success"].(bool); !ok || !success {
 		t.Fatalf("read-file failed: %v", lastReqBody["log"])
 	}
-	if data, ok := lastReqBody["data"].(string); !ok || data != base64.StdEncoding.EncodeToString([]byte("hello rasnuone")) {
+	if data, ok := lastReqBody["data"].(string); !ok || data != base64.StdEncoding.EncodeToString([]byte("hello rasnuos")) {
 		t.Errorf("read-file data mismatch. Got: %v", lastReqBody["data"])
 	}
 

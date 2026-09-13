@@ -1,11 +1,11 @@
-# RasnuOne Agent
+# RasnuOS Agent
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8.svg)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue.svg)]()
 
-The **RasnuOne Agent** is a lightweight, open-source daemon written in Go. It is installed on your server and acts as the secure bridge between your infrastructure and the RasnuOne management dashboard. It connects outbound to our WebSocket server, receives instructions, executes them on your machine, and streams the results back in real time.
+The **RasnuOS Agent** is a lightweight, open-source daemon written in Go. It is installed on your server and acts as the secure bridge between your infrastructure and the RasnuOS management dashboard. It connects outbound to our WebSocket server, receives instructions, executes them on your machine, and streams the results back in real time.
 
 **This repository is fully open-source so you can audit every line of code before putting it on your server.** We believe no one should install a black-box binary with root access without being able to read exactly what it does. Everything described in this document is implemented in the code you are looking at right now — nothing more, nothing less.
 
@@ -35,7 +35,7 @@ The **RasnuOne Agent** is a lightweight, open-source daemon written in Go. It is
 
 When the agent starts, it does three things concurrently:
 
-1. **Connects to the RasnuOne Reverb WebSocket server** and subscribes to three private, server-specific channels: a general command channel, an OS management channel, and a dedicated terminal channel.
+1. **Connects to the RasnuOS Reverb WebSocket server** and subscribes to three private, server-specific channels: a general command channel, an OS management channel, and a dedicated terminal channel.
 2. **Starts a metrics engine** that collects CPU, RAM, disk, swap, network I/O, running processes, and service states every 15 seconds, then ships that data to the dashboard.
 3. **Starts an idle terminal session cleaner** that closes any PTY session that has been inactive for more than 30 minutes.
 
@@ -196,7 +196,7 @@ The migration engine allows moving data directly from one server to another with
 3. It runs `rsync -avz --progress` pointed at the local loopback proxy, with the rsync password injected via the `RSYNC_PASSWORD` environment variable (never as a CLI flag).
 4. Rsync retries up to 5 times with a 2-second delay between attempts.
 
-The result: your file data travels directly between the two servers over an encrypted, fingerprint-verified tunnel. It never passes through RasnuOne servers.
+The result: your file data travels directly between the two servers over an encrypted, fingerprint-verified tunnel. It never passes through RasnuOS servers.
 
 ### 5. Real-Time Metrics
 
@@ -256,9 +256,9 @@ The agent reads configuration from CLI flags, falling back to environment variab
 | Flag | Environment Variable | Description |
 |---|---|---|
 | `--server` | `REVERB_SCHEME`, `REVERB_HOST`, `REVERB_PORT`, `REVERB_APP_KEY` | The Reverb WebSocket URL. The flag accepts the full URL; the env vars are combined to build it. |
-| `--api` | `API_URL` | The base URL of the RasnuOne Laravel API. |
+| `--api` | `API_URL` | The base URL of the RasnuOS Laravel API. |
 | `--token` | `BEARER_TOKEN` | The agent's authentication token issued by the dashboard. **Required.** |
-| `--server-id` | `SERVER_ID` | The server's ID in the RasnuOne platform. **Required.** |
+| `--server-id` | `SERVER_ID` | The server's ID in the RasnuOS platform. **Required.** |
 | `--tls-pin` | `TLS_PIN` | Comma-separated SHA-256 SPKI hashes for TLS certificate pinning. Optional. |
 | `--version` | — | Prints the agent version and exits. |
 
@@ -274,14 +274,14 @@ The agent has almost no external dependencies — the only required library for 
 
 ```bash
 # Clone the repository
-git clone https://github.com/rasnu/rasnuone-agent.git
-cd rasnuone-agent
+git clone https://github.com/rasnu/rasnuos-agent.git
+cd rasnuos-agent
 
 # Download dependencies
 go mod tidy
 
 # Build for your current platform
-go build -o rasnuone-agent .
+go build -o rasnuos-agent .
 ```
 
 To build all six platform variants at once, use the provided script:
@@ -337,7 +337,7 @@ go test -v -run TestSignature ./...
 
 ## License and Copyright
 
-Project: **RasnuOne**  
+Project: **RasnuOS**  
 Copyright © 2026 Rasnu LLC (rasnu.com). All rights reserved.
 
 This agent is open-sourced under the MIT License to ensure complete transparency for our infrastructure management community. You are free to audit, fork, and compile it yourself.

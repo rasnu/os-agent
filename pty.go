@@ -1,5 +1,5 @@
 /**
- * Project: RasnuOne
+ * Project: RasnuOS
  * Copyright © 2026 Rasnu LLC (rasnu.com). All rights reserved.
  */
 package main
@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"rasnuone-agent/os_adapter"
+	"rasnuos-agent/os_adapter"
 )
 
 type PTYSession struct {

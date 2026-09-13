@@ -24,7 +24,7 @@ func (a *WindowsAdapter) ReplaceBinary(tempPath, currentPath string) error {
 }
 
 func (a *WindowsAdapter) RestartAgent() error {
-	cmd := exec.Command("powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", "Start-Sleep -Seconds 2; Restart-Service -Name RasnuCloudAgent")
+	cmd := exec.Command("powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", "Start-Sleep -Seconds 2; Restart-Service -Name RasnuOSAgent")
 	if err := cmd.Start(); err != nil {
 		os.Exit(0)
 	}
@@ -54,5 +54,5 @@ func (a *WindowsAdapter) WriteCronJobs(content string) error {
 }
 
 func (a *WindowsAdapter) LogFilePath() string {
-	return `C:\ProgramData\RasnuOne\Agent\rasnuone-agent.log`
+	return `C:\ProgramData\RasnuOS\Agent\rasnuos-agent.log`
 }

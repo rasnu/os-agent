@@ -43,5 +43,5 @@ func (a *MacOSAdapter) WriteCronJobs(content string) error {
 }
 
 func (a *MacOSAdapter) LogFilePath() string {
-	return "/var/log/rasnuone-agent.log"
+	return "/var/log/rasnuos-agent.log"
 }

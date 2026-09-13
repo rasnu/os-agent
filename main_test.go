@@ -29,8 +29,8 @@ func TestMain_VersionFlag(t *testing.T) {
 	io.Copy(&buf, r)
 	output := buf.String()
 
-	if !strings.Contains(output, "rasnuone-agent") {
-		t.Errorf("Expected output to contain 'rasnuone-agent', got %q", output)
+	if !strings.Contains(output, "rasnuos-agent") {
+		t.Errorf("Expected output to contain 'rasnuos-agent', got %q", output)
 	}
 }
 

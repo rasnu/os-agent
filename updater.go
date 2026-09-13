@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	"rasnuone-agent/os_adapter"
+	"rasnuos-agent/os_adapter"
 )
 
 // In production, this key will be injected during the agent build process.

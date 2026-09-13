@@ -69,7 +69,7 @@ func TestLinuxAdapter_ReplaceBinary(t *testing.T) {
 func TestLinuxAdapter_LogFilePath(t *testing.T) {
 	adapter := &LinuxAdapter{}
 	path := adapter.LogFilePath()
-	if path != "/var/log/rasnuone-agent.log" {
-		t.Errorf("Expected /var/log/rasnuone-agent.log, got %s", path)
+	if path != "/var/log/rasnuos-agent.log" {
+		t.Errorf("Expected /var/log/rasnuos-agent.log, got %s", path)
 	}
 }
