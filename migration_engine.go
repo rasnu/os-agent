@@ -59,6 +59,7 @@ func (c *PusherClient) handleMigrationCommand(action string, args map[string]int
 			port = int(portF)
 		}
 		c.prepareMigrationReceiver(pipelineId, stepId, targetPath, token, port)
+		logAuditEvent(AuditEvent{Action: "prepare_migration_receiver", PipelineID: pipelineId, StepID: stepId, Command: fmt.Sprintf("Port:%d Path:%s", port, targetPath), Success: true})
 	case "execute-migration-sender":
 		host := getString(args, "host")
 		portF, ok := args["port"].(float64)
@@ -75,15 +76,18 @@ func (c *PusherClient) handleMigrationCommand(action string, args map[string]int
 			return
 		}
 		c.executeMigrationSender(pipelineId, stepId, mode, sourcePath, targetPath, host, port, token, fingerprint, rsyncPassword)
+		logAuditEvent(AuditEvent{Action: "execute_migration_sender", PipelineID: pipelineId, StepID: stepId, Command: fmt.Sprintf("Host:%s Source:%s Dest:%s", host, sourcePath, targetPath), Success: true})
 	case "stop-migration-receiver":
 		shutdownMigrationServer(token)
 		c.sendMigrationCompletion(pipelineId, stepId, true, "Migration receiver stopped", nil)
+		logAuditEvent(AuditEvent{Action: "stop_migration_receiver", PipelineID: pipelineId, StepID: stepId, Success: true})
 	case "prepare-p2p-receiver":
 		portF, ok := args["port"].(float64)
 		port := 0
 		if ok { port = int(portF) }
 		receiveCmd := getString(args, "receive_command")
 		c.prepareP2pReceiver(pipelineId, stepId, receiveCmd, token, port)
+		logAuditEvent(AuditEvent{Action: "prepare_p2p_receiver", PipelineID: pipelineId, StepID: stepId, Command: redactSecrets(receiveCmd), Success: true})
 	case "run-p2p-sender":
 		host := getString(args, "host")
 		portF, ok := args["port"].(float64)
@@ -92,16 +96,20 @@ func (c *PusherClient) handleMigrationCommand(action string, args map[string]int
 		fingerprint := getString(args, "fingerprint")
 		sendCmd := getString(args, "send_command")
 		c.runP2pSender(pipelineId, stepId, sendCmd, host, port, fingerprint, token)
+		logAuditEvent(AuditEvent{Action: "run_p2p_sender", PipelineID: pipelineId, StepID: stepId, Command: redactSecrets(sendCmd), Success: true})
 	case "stop-p2p-receiver":
 		shutdownMigrationServer(token)
 		c.sendMigrationCompletion(pipelineId, stepId, true, "P2P receiver stopped", nil)
+		logAuditEvent(AuditEvent{Action: "stop_p2p_receiver", PipelineID: pipelineId, StepID: stepId, Success: true})
 	case "inject-secret":
 		// Pillar 3: Zero-Trust in-RAM secret injection.
 		// SECURITY: secrets are stored in process RAM only, never written to disk.
 		// The token arg here is the secret scope key, NOT the agent auth token.
 		c.handleInjectSecret(pipelineId, stepId, args)
+		logAuditEvent(AuditEvent{Action: "inject_secret", PipelineID: pipelineId, StepID: stepId, Success: true})
 	default:
 		c.sendMigrationCompletion(pipelineId, stepId, false, "Unknown migration action", nil)
+		logAuditEvent(AuditEvent{Action: "unknown_migration", PipelineID: pipelineId, StepID: stepId, Success: false, Error: "Unknown migration action"})
 	}
 }
 

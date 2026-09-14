@@ -150,7 +150,7 @@ func (c *PusherClient) handleInjectSecret(pipelineId, stepId string, args map[st
 
 	// Build audit-safe log line. NEVER log the values.
 	safeLog := fmt.Sprintf("[VAULT] Secrets securely injected into RAM. Keys available for this scope: %v. Auto-wipe in %s.", keyNames, secretTTL)
-	log.Printf(safeLog)
+	log.Println(safeLog)
 
 	c.sendMigrationCompletion(pipelineId, stepId, true, safeLog, map[string]interface{}{
 		"injected_keys": keyNames,

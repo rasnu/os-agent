@@ -100,6 +100,7 @@ func (c *PusherClient) executeSelfUpdate(downloadUrl, signatureBase64, pipelineI
 	}
 
 	log.Printf("Update installed successfully. Scheduling restart...")
+	logAuditEvent(AuditEvent{Action: "execute_self_update", PipelineID: pipelineId, StepID: stepId, Success: true})
 
 	// Report success if part of a pipeline
 	if pipelineId != "" && stepId != "" {
@@ -116,6 +117,7 @@ func (c *PusherClient) executeSelfUpdate(downloadUrl, signatureBase64, pipelineI
 
 func (c *PusherClient) reportUpdateFailure(pipelineId, stepId, errStr string) {
 	log.Printf("Self-Update failed: %s", errStr)
+	logAuditEvent(AuditEvent{Action: "execute_self_update", PipelineID: pipelineId, StepID: stepId, Success: false, Error: errStr})
 	if pipelineId != "" && stepId != "" {
 		c.sendCompletion(pipelineId, stepId, false, errStr)
 	}

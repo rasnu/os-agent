@@ -404,6 +404,11 @@ func (c *PusherClient) readPump() {
 				if action != "" {
 					c.runCommand(func() { c.handleMigrationCommand(action, args) })
 				}
+			case "execute-tunnel-command":
+				action := getString(args, "action")
+				if action != "" {
+					c.runCommand(func() { c.handleTunnelCommand(action, args) })
+				}
 			case "execute-command", "restart-service", "start-service", "stop-service", "kill-process", "sync-cron-jobs", "upload-file-to-dashboard", "download-file-from-dashboard":
 				c.runCommand(func() { c.handleAgentCommand(command, args) })
 			default:
@@ -478,6 +483,8 @@ func (c *PusherClient) readPump() {
 func (c *PusherClient) handleAgentCommand(command string, args map[string]interface{}) {
 
 	var errMsg string
+	pipelineId := getString(args, "pipeline_id")
+	stepId := getString(args, "step_id")
 
 	switch command {
 	case "execute-self-update":
@@ -486,8 +493,6 @@ func (c *PusherClient) handleAgentCommand(command string, args map[string]interf
 			errMsg = "download_url is required for self update"
 			break
 		}
-		pipelineId := getString(args, "pipeline_id")
-		stepId := getString(args, "step_id")
 		signature := getString(args, "signature")
 		c.runCommand(func() { c.executeSelfUpdate(downloadUrl, signature, pipelineId, stepId) })
 
@@ -549,9 +554,11 @@ func (c *PusherClient) handleAgentCommand(command string, args map[string]interf
 		if err != nil {
 			errMsg = fmt.Sprintf("Failed to %s service %s: %v\nOutput: %s", action, service, err, string(output))
 			log.Printf("%s", errMsg)
+			logAuditEvent(AuditEvent{Action: command, PipelineID: pipelineId, StepID: stepId, Command: service, Success: false, Error: errMsg})
 		} else {
 			successMsg := fmt.Sprintf("Service %s %sed successfully.\nOutput: %s", service, action, string(output))
 			log.Printf("%s", successMsg)
+			logAuditEvent(AuditEvent{Action: command, PipelineID: pipelineId, StepID: stepId, Command: service, Success: true})
 		}
 
 	case "kill-process":
@@ -570,9 +577,11 @@ func (c *PusherClient) handleAgentCommand(command string, args map[string]interf
 		if err != nil {
 			errMsg = fmt.Sprintf("Failed to kill process %s: %v\nOutput: %s", pid, err, string(output))
 			log.Printf("%s", errMsg)
+			logAuditEvent(AuditEvent{Action: command, PipelineID: pipelineId, StepID: stepId, Command: pid, Success: false, Error: errMsg})
 		} else {
 			successMsg := fmt.Sprintf("Process %s killed successfully.\nOutput: %s", pid, string(output))
 			log.Printf("%s", successMsg)
+			logAuditEvent(AuditEvent{Action: command, PipelineID: pipelineId, StepID: stepId, Command: pid, Success: true})
 		}
 
 	case "sync-cron-jobs":
@@ -581,8 +590,10 @@ func (c *PusherClient) handleAgentCommand(command string, args map[string]interf
 		if err := os_adapter.Current().WriteCronJobs(content); err != nil {
 			errMsg = fmt.Sprintf("error syncing cron jobs: %v", err)
 			log.Printf("%s", errMsg)
+			logAuditEvent(AuditEvent{Action: command, PipelineID: pipelineId, StepID: stepId, Success: false, Error: errMsg})
 		} else {
 			log.Printf("Successfully synced cron jobs")
+			logAuditEvent(AuditEvent{Action: command, PipelineID: pipelineId, StepID: stepId, Success: true})
 		}
 
 	default:

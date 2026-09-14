@@ -56,6 +56,14 @@ func (m *MockAdapter) LogFilePath() string {
 	return "rasnuos-agent.log"
 }
 
+func (m *MockAdapter) PunchFirewallHole(port int) error {
+	return nil
+}
+
+func (m *MockAdapter) CloseFirewallHole(port int) error {
+	return nil
+}
+
 func TestCurrentPanicsWhenNil(t *testing.T) {
 	// Ensure we start with nil for this test
 	originalAdapter := currentAdapter

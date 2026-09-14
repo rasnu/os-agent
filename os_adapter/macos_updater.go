@@ -4,8 +4,10 @@
 package os_adapter
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 )
 
@@ -28,7 +30,26 @@ func (a *MacOSAdapter) RestartAgent() error {
 }
 
 func (a *MacOSAdapter) ManageService(action, service string) (string, error) {
-	out, err := exec.Command("launchctl", action, service).CombinedOutput()
+	// Try brew services first (covers all Homebrew-installed services).
+	if action == "restart" {
+		exec.Command("brew", "services", "stop", service).Run()
+		out, err := exec.Command("brew", "services", "start", service).CombinedOutput()
+		if err == nil {
+			return string(out), nil
+		}
+	} else {
+		out, err := exec.Command("brew", "services", action, service).CombinedOutput()
+		if err == nil {
+			return string(out), nil
+		}
+	}
+
+	// Fallback: launchctl for system-level daemons.
+	launchctlAction := "kickstart"
+	if action == "stop" {
+		launchctlAction = "kill"
+	}
+	out, err := exec.Command("launchctl", launchctlAction, service).CombinedOutput()
 	return string(out), err
 }
 
@@ -38,7 +59,13 @@ func (a *MacOSAdapter) KillProcess(pid string) (string, error) {
 }
 
 func (a *MacOSAdapter) WriteCronJobs(content string) error {
-	// Not natively applicable via simple daemon restarts
+	// Write the content to the user's crontab via `crontab -` (reads from stdin).
+	cmd := exec.Command("crontab", "-")
+	cmd.Stdin = strings.NewReader(content)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("WriteCronJobs: crontab error: %w — %s", err, string(out))
+	}
 	return nil
 }
 

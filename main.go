@@ -65,7 +65,10 @@ func buildServerURL(flagValue string) string {
 	return fmt.Sprintf("%s://%s:%s/app/%s?protocol=7&client=rasnuos-agent&version=1.0.0", scheme, host, port, appKey)
 }
 
-func run(args []string) error {
+// runAgent contains the full agent lifecycle. It accepts an external shutdown
+// channel so it can be controlled by both OS signals (Linux/macOS/direct run)
+// and the Windows SCM stop handler (windows_service.go).
+func runAgent(args []string, shutdown chan struct{}) error {
 	logFilePath := os_adapter.Current().LogFilePath()
 	if logFilePath != "" {
 		lumberjackLogger := &lumberjack.Logger{
@@ -120,25 +123,47 @@ func run(args []string) error {
 	}
 
 	client := NewPusherClient(serverURL, apiURL, token, serverId, tlsPin)
-	shutdownChan := make(chan struct{})
-	go client.ConnectAndMonitor(shutdownChan)
-	go client.StartMetricsEngine(shutdownChan)
-	go CleanupIdleSessions(shutdownChan)
+	go client.ConnectAndMonitor(shutdown)
+	go client.StartMetricsEngine(shutdown)
+	go CleanupIdleSessions(shutdown)
 
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
-	sig := <-interrupt
+	<-shutdown
 
-	log.Printf("Received %s, shutting down agent...", sig)
-	close(shutdownChan)
-	log.Println("Waiting for in-progress commands to finish...")
+	log.Printf("Shutdown signal received, stopping agent...")
 	client.WaitCommands()
 	log.Println("Agent stopped.")
 	return nil
 }
 
+// run is the entry point for non-service (direct / CLI) execution. It wires
+// OS signals into the shared runAgent() shutdown channel.
+func run(args []string) error {
+	shutdown := make(chan struct{})
+
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		sig := <-interrupt
+		log.Printf("Received %s, shutting down agent...", sig)
+		close(shutdown)
+	}()
+
+	return runAgent(args, shutdown)
+}
+
 func main() {
+	// On Windows, detect whether we were started by SCM and hand off to the
+	// service runner. This is a no-op on Linux/macOS (isRunningAsWindowsService
+	// is defined to always return false on non-Windows builds).
+	if isRunningAsWindowsService() {
+		if err := runAsWindowsService(); err != nil {
+			log.Fatalf("Service exited with error: %v", err)
+		}
+		return
+	}
+
 	if err := run(os.Args[1:]); err != nil {
 		log.Fatal(err)
 	}
 }
+

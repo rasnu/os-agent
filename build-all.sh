@@ -29,7 +29,7 @@ GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o ../public/agent-binaries/r
 echo "Generating SHA-256 Checksums..."
 cd ../public/agent-binaries
 for file in rasnuos-agent-*; do
-    if [[ "$file" != *.sha256 ]]; then
+    if [ "${file##*.}" != "sha256" ]; then
         sha256sum "$file" > "${file}.sha256"
         echo "  - ${file}.sha256"
     fi

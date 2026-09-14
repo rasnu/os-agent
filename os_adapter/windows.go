@@ -9,7 +9,6 @@ import (
 	"io"
 	"os/exec"
 	"sort"
-	"strings"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
@@ -89,11 +88,61 @@ func (a *WindowsAdapter) GetMetrics() (Metrics, []error) {
 }
 
 func (a *WindowsAdapter) GetShellCmd(ctx context.Context, script string, runAsUser string) *exec.Cmd {
+	// The agent runs as a Windows Service in Session 0 (isolated from the
+	// interactive desktop). These helper functions let PowerShell scripts work
+	// with the user's interactive session without any P/Invoke or C# Add-Type.
+	const session0Preamble = `
+# ── RasnuOS Session-Bridge Helpers ─────────────────────────────────────────────
+# Returns the session ID of the first active interactive user (explorer owner).
+function _RasnuGetUserSession {
+    $p = Get-Process explorer -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($p) { return $p.SessionId } else { return 1 }
+}
+
+# Lists all processes that belong to the interactive user session.
+# Use this instead of filtering by MainWindowTitle (which is empty from Session 0).
+function _RasnuGetUserProcesses {
+    $sid = _RasnuGetUserSession
+    Get-Process | Where-Object { $_.SessionId -eq $sid } | Sort-Object WorkingSet64 -Descending
+}
+
+# Launches a GUI application in the interactive user session via Task Scheduler.
+# This is the ONLY reliable way to open a visible window from Session 0.
+# Usage: _RasnuLaunchAsUser "C:\path\to\app.exe" ["-arg1" "-arg2"]
+function _RasnuLaunchAsUser {
+    param([string]$FilePath, [string[]]$ArgumentList = @())
+    if (-not (Test-Path $FilePath)) { throw "Executable not found: $FilePath" }
+    $taskName = "RasnuOS_Launch_" + [System.Guid]::NewGuid().ToString("N").Substring(0,8)
+    $args     = if ($ArgumentList.Count -gt 0) { $ArgumentList -join " " } else { $null }
+    $action   = if ($args) {
+        New-ScheduledTaskAction -Execute $FilePath -Argument $args
+    } else {
+        New-ScheduledTaskAction -Execute $FilePath
+    }
+    $trigger   = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(2)
+    $userName  = (Get-Process explorer -ErrorAction SilentlyContinue |
+                  Select-Object -First 1 |
+                  ForEach-Object { (Get-WmiObject Win32_Process -Filter "ProcessId=$($_.Id)").GetOwner() } |
+                  ForEach-Object { "$($_.Domain)\$($_.User)" })
+    $principal = New-ScheduledTaskPrincipal -UserId $userName -LogonType Interactive -RunLevel Highest
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null
+    Start-Sleep -Milliseconds 500
+    Start-ScheduledTask -TaskName $taskName
+    Start-Sleep -Seconds 2
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+    Write-Output "Launched: $FilePath (via user session)"
+}
+# ────────────────────────────────────────────────────────────────────────────────
+`
+
+	fullScript := session0Preamble + "\n" + script
+
 	if runAsUser != "" {
 		// Stream a visible warning back to the Laravel frontend UI that Windows impersonation is ignored.
-		script = fmt.Sprintf("Write-Output 'Warning: run_as_user (%s) is ignored on Windows without credentials. Running as SYSTEM.';\n%s", runAsUser, script)
+		fullScript = fmt.Sprintf("Write-Output 'Warning: run_as_user (%s) is ignored on Windows without credentials. Running as SYSTEM.';\n%s", runAsUser, fullScript)
 	}
-	return exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", script)
+
+	return exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", fullScript)
 }
 
 func (a *WindowsAdapter) StartPTY(cols, rows uint16) (PTY, error) {
@@ -199,13 +248,6 @@ func getSwapUsage() (float64, error) {
 	return s.UsedPercent, nil
 }
 
-func getDiskUsage() (float64, error) {
-	d, err := disk.Usage("C:") // Default to C: for windows
-	if err != nil {
-		return 0.0, err
-	}
-	return d.UsedPercent, nil
-}
 
 func getLoadAvg() (string, error) {
 	l, err := load.Avg()
@@ -289,26 +331,6 @@ func getTopProcesses() ([]Process, error) {
 	return result, nil
 }
 
-func getServiceStatuses() ([]ServiceStatus, error) {
-	servicesToCheck := []string{"nginx", "mysql", "docker", "sshd"}
-	statuses := make([]ServiceStatus, 0)
-
-	for _, srv := range servicesToCheck {
-		statusStr := "inactive"
-		// This uses powershell for simplicity as gopsutil does not natively support services.
-		cmd := fmt.Sprintf(`(Get-Service '%s' -ErrorAction SilentlyContinue).Status`, srv)
-		out, err := exec.Command("powershell", "-NoProfile", "-Command", cmd).Output()
-		if err == nil && strings.Contains(strings.ToLower(string(out)), "running") {
-			statusStr = "active"
-		}
-		statuses = append(statuses, ServiceStatus{
-			Name:   srv,
-			Status: statusStr,
-		})
-	}
-
-	return statuses, nil
-}
 
 func (a *WindowsAdapter) PunchFirewallHole(port int) error {
 	portStr := fmt.Sprintf("%d", port)

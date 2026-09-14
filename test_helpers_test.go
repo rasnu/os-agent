@@ -143,6 +143,14 @@ func (m *MockOSAdapter) LogFilePath() string {
 	return "rasnuos-agent.log"
 }
 
+func (m *MockOSAdapter) PunchFirewallHole(port int) error {
+	return nil
+}
+
+func (m *MockOSAdapter) CloseFirewallHole(port int) error {
+	return nil
+}
+
 func SetupMockAdapter() *MockOSAdapter {
 	mock := &MockOSAdapter{
 		MockMetrics: os_adapter.Metrics{

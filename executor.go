@@ -233,9 +233,26 @@ func (c *PusherClient) executeAndStream(pipelineId string, stepId string, comman
 	if cmdErr != nil {
 		c.streamLogWS(pipelineId, stepId, fmt.Sprintf("\nCommand finished with error: %v\n", cmdErr), logBuf)
 		c.sendCompletion(pipelineId, stepId, false, logBuf.String())
+		logAuditEvent(AuditEvent{
+			Action:     "execute_command",
+			PipelineID: pipelineId,
+			StepID:     stepId,
+			Command:    redactSecrets(command),
+			RunAsUser:  runAsUser,
+			Success:    false,
+			Error:      cmdErr.Error(),
+		})
 	} else {
 		c.streamLogWS(pipelineId, stepId, "\nCommand finished successfully.\n", logBuf)
 		c.sendCompletion(pipelineId, stepId, true, logBuf.String())
+		logAuditEvent(AuditEvent{
+			Action:     "execute_command",
+			PipelineID: pipelineId,
+			StepID:     stepId,
+			Command:    redactSecrets(command),
+			RunAsUser:  runAsUser,
+			Success:    true,
+		})
 	}
 }
 
@@ -386,8 +403,19 @@ func (c *PusherClient) executeDiscovery(script string) {
 
 	if err != nil {
 		log.Printf("Discovery execution finished with error: %v", err)
+		logAuditEvent(AuditEvent{
+			Action:     "execute_discovery",
+			Command:    "INTERNAL_DISCOVERY_SCRIPT",
+			Success:    false,
+			Error:      err.Error(),
+		})
 	} else {
 		log.Printf("Discovery execution finished successfully.")
+		logAuditEvent(AuditEvent{
+			Action:     "execute_discovery",
+			Command:    "INTERNAL_DISCOVERY_SCRIPT",
+			Success:    true,
+		})
 	}
 
 	c.sendDiscoveryCompletion(string(output))
@@ -443,6 +471,22 @@ func (c *PusherClient) executeRawCommand(requestId, cmdStr, runAsUser string) {
 	logMsg := string(output)
 	if err != nil {
 		logMsg = fmt.Sprintf("Command failed: %v\nOutput: %s", err, string(output))
+		logAuditEvent(AuditEvent{
+			Action:     "execute_raw_command",
+			StepID:     requestId,
+			Command:    redactSecrets(cmdStr),
+			RunAsUser:  runAsUser,
+			Success:    false,
+			Error:      err.Error(),
+		})
+	} else {
+		logAuditEvent(AuditEvent{
+			Action:     "execute_raw_command",
+			StepID:     requestId,
+			Command:    redactSecrets(cmdStr),
+			RunAsUser:  runAsUser,
+			Success:    true,
+		})
 	}
 
 	c.sendCompletion("sync", requestId, success, logMsg)

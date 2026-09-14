@@ -1,6 +1,6 @@
 module rasnuos-agent
 
-go 1.21
+go 1.26.0
 
 require github.com/gorilla/websocket v1.5.1
 
@@ -12,12 +12,15 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	golang.org/x/net v0.17.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 )
 
 require (
 	github.com/creack/pty v1.1.21
+	github.com/hashicorp/yamux v0.1.2
 	github.com/shirou/gopsutil/v3 v3.24.5
+	golang.org/x/sys v0.48.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )

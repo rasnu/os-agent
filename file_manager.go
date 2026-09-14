@@ -174,6 +174,12 @@ func (c *PusherClient) handleFileCommand(action string, args map[string]interfac
 		logMsg = "Unknown file action"
 	}
 
+	if !success {
+		logAuditEvent(AuditEvent{Action: "file_" + action, PipelineID: pipelineId, StepID: stepId, Command: path, Success: false, Error: logMsg})
+	} else {
+		logAuditEvent(AuditEvent{Action: "file_" + action, PipelineID: pipelineId, StepID: stepId, Command: path, Success: true})
+	}
+
 	c.sendFileCompletion(pipelineId, stepId, success, logMsg, data)
 }
 
@@ -319,6 +325,7 @@ func (c *PusherClient) uploadFileToDashboard(requestId, filePath, uploadUrl stri
 	}
 
 	c.sendCompletion("sync", requestId, true, fmt.Sprintf("File %s uploaded successfully", filePath))
+	logAuditEvent(AuditEvent{Action: "upload_file_to_dashboard", StepID: requestId, Command: filePath, Success: true})
 }
 
 func (c *PusherClient) downloadFileFromDashboard(requestId, targetPath, downloadUrl string) {
@@ -327,6 +334,7 @@ func (c *PusherClient) downloadFileFromDashboard(requestId, targetPath, download
 	req, err := http.NewRequest("GET", downloadUrl, nil)
 	if err != nil {
 		c.sendCompletion("sync", requestId, false, fmt.Sprintf("Failed to create download request: %v", err))
+		logAuditEvent(AuditEvent{Action: "download_file_from_dashboard", StepID: requestId, Command: targetPath, Success: false, Error: err.Error()})
 		return
 	}
 	req.Header.Set("Authorization", "Bearer "+c.Token)
@@ -334,26 +342,29 @@ func (c *PusherClient) downloadFileFromDashboard(requestId, targetPath, download
 	resp, err := fileTransferHTTPClient.Do(req)
 	if err != nil {
 		c.sendCompletion("sync", requestId, false, fmt.Sprintf("Failed to download file: %v", err))
+		logAuditEvent(AuditEvent{Action: "download_file_from_dashboard", StepID: requestId, Command: targetPath, Success: false, Error: err.Error()})
 		return
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		c.sendCompletion("sync", requestId, false, fmt.Sprintf("Dashboard rejected file download [%d]: %s", resp.StatusCode, string(body)))
+		logAuditEvent(AuditEvent{Action: "download_file_from_dashboard", StepID: requestId, Command: targetPath, Success: false, Error: string(body)})
 		return
 	}
 
 	out, err := os.Create(targetPath)
 	if err != nil {
-		c.sendCompletion("sync", requestId, false, fmt.Sprintf("Failed to create target file: %v", err))
+		c.sendCompletion("sync", requestId, false, fmt.Sprintf("Failed to create target file %s: %v", targetPath, err))
+		logAuditEvent(AuditEvent{Action: "download_file_from_dashboard", StepID: requestId, Command: targetPath, Success: false, Error: err.Error()})
 		return
 	}
 	defer out.Close()
 
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		c.sendCompletion("sync", requestId, false, fmt.Sprintf("Failed to save downloaded file: %v", err))
+	if _, err := io.Copy(out, resp.Body); err != nil {
+		c.sendCompletion("sync", requestId, false, fmt.Sprintf("Failed to write to file %s: %v", targetPath, err))
+		logAuditEvent(AuditEvent{Action: "download_file_from_dashboard", StepID: requestId, Command: targetPath, Success: false, Error: err.Error()})
 		return
 	}
 
@@ -364,15 +375,18 @@ func (c *PusherClient) downloadFileFromDashboard(requestId, targetPath, download
 		hash := sha256.New()
 		if _, err := io.Copy(hash, out); err != nil {
 			c.sendCompletion("sync", requestId, false, fmt.Sprintf("Failed to compute downloaded file hash: %v", err))
+			logAuditEvent(AuditEvent{Action: "download_file_from_dashboard", StepID: requestId, Command: targetPath, Success: false, Error: err.Error()})
 			return
 		}
 		actualHash := hex.EncodeToString(hash.Sum(nil))
 		if actualHash != expectedHash {
 			os.Remove(targetPath)
 			c.sendCompletion("sync", requestId, false, fmt.Sprintf("File integrity check failed (SHA256 mismatch). Expected: %s, Actual: %s", expectedHash, actualHash))
+			logAuditEvent(AuditEvent{Action: "download_file_from_dashboard", StepID: requestId, Command: targetPath, Success: false, Error: "SHA256 hash mismatch"})
 			return
 		}
 	}
 
 	c.sendCompletion("sync", requestId, true, fmt.Sprintf("File %s downloaded successfully", targetPath))
+	logAuditEvent(AuditEvent{Action: "download_file_from_dashboard", StepID: requestId, Command: targetPath, Success: true})
 }
