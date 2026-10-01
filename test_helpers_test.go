@@ -68,7 +68,9 @@ type MockOSAdapter struct {
 	KillProcessFunc   func(pid string) (string, error)
 	StartPTYFunc      func(cols, rows uint16) (os_adapter.PTY, error)
 	WriteCronJobsFunc func(content string) error
-	GetShellCmdFunc   func(ctx context.Context, script string, runAsUser string) *exec.Cmd
+	GetShellCmdFunc           func(ctx context.Context, script string, runAsUser string) *exec.Cmd
+	ExecuteComputerActionFunc func(action, text string, x, y int) ([]byte, error)
+	GetMachineIDFunc          func() string
 }
 
 func (m *MockOSAdapter) GetMetrics() (os_adapter.Metrics, []error) {
@@ -149,6 +151,20 @@ func (m *MockOSAdapter) PunchFirewallHole(port int) error {
 
 func (m *MockOSAdapter) CloseFirewallHole(port int) error {
 	return nil
+}
+
+func (m *MockOSAdapter) ExecuteComputerAction(action, text string, x, y int) ([]byte, error) {
+	if m.ExecuteComputerActionFunc != nil {
+		return m.ExecuteComputerActionFunc(action, text, x, y)
+	}
+	return nil, nil
+}
+
+func (m *MockOSAdapter) GetMachineID() string {
+	if m.GetMachineIDFunc != nil {
+		return m.GetMachineIDFunc()
+	}
+	return "mock-machine-id"
 }
 
 func SetupMockAdapter() *MockOSAdapter {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
@@ -92,11 +93,21 @@ func (a *LinuxAdapter) GetMetrics() (Metrics, []error) {
 }
 
 func (a *LinuxAdapter) GetShellCmd(ctx context.Context, script string, runAsUser string) *exec.Cmd {
+	var cmd *exec.Cmd
 	if runAsUser != "" {
 		// Use su to switch to the user. -s /bin/bash ensures a valid shell even if the user has /bin/false
-		return exec.CommandContext(ctx, "su", "-s", "/bin/bash", runAsUser, "-c", script)
+		cmd = exec.CommandContext(ctx, "su", "-s", "/bin/bash", runAsUser, "-c", script)
+	} else {
+		cmd = exec.CommandContext(ctx, "bash", "-c", script)
 	}
-	return exec.CommandContext(ctx, "bash", "-c", script)
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		// Send SIGKILL to the entire process group to prevent orphaned children
+		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
+
+	return cmd
 }
 
 func (a *LinuxAdapter) StartPTY(cols, rows uint16) (PTY, error) {
@@ -359,4 +370,178 @@ func (a *LinuxAdapter) CloseFirewallHole(port int) error {
 	exec.Command("ufw", "delete", "allow", fmt.Sprintf("%s/tcp", portStr)).Run()
 	exec.Command("iptables", "-D", "INPUT", "-p", "tcp", "--dport", portStr, "-j", "ACCEPT").Run()
 	return nil
+}
+
+func (a *LinuxAdapter) ExecuteComputerAction(action, text string, x, y int) ([]byte, error) {
+	isWayland := a.setupDisplayEnvironment()
+
+	switch action {
+	case "open_application":
+		app := text
+		switch strings.ToLower(text) {
+		case "terminal":
+			app = "x-terminal-emulator"
+			if err := exec.Command("which", app).Run(); err != nil {
+				app = "gnome-terminal"
+			}
+		case "file manager", "explorer":
+			app = "xdg-open"
+		case "browser":
+			app = "x-www-browser"
+			if err := exec.Command("which", app).Run(); err != nil {
+				app = "xdg-open"
+			}
+		}
+
+		var cmd *exec.Cmd
+		if app == "xdg-open" && (strings.ToLower(text) == "file manager" || strings.ToLower(text) == "explorer") {
+			homeDir, _ := os.UserHomeDir()
+			cmd = exec.Command("xdg-open", homeDir)
+		} else if app == "xdg-open" && strings.ToLower(text) == "browser" {
+			cmd = exec.Command("xdg-open", "https://google.com")
+		} else {
+			cmd = exec.Command(app)
+		}
+
+		err := cmd.Start()
+		if err != nil {
+			return nil, fmt.Errorf("failed to open application %s: %w", text, err)
+		}
+
+		// Clean up the process when it exits so it doesn't become a zombie
+		go func() {
+			cmd.Wait()
+		}()
+
+		return []byte(fmt.Sprintf("Launched %s successfully", text)), nil
+	case "list_windows":
+		if isWayland {
+			return nil, fmt.Errorf("Window management (list_windows) is strictly blocked by the Wayland security model. Please switch to X11, or use coordinate-based mouse interactions")
+		}
+		out, err := exec.Command("wmctrl", "-l").CombinedOutput()
+		if err != nil {
+			return nil, fmt.Errorf("wmctrl failed (is it installed?): %w, output: %s", err, string(out))
+		}
+		// wmctrl -l format: <window ID> <desktop ID> <client machine> <window title>
+		// We must extract only the window title to ensure cross-platform consistency
+		var titles []string
+		lines := strings.Split(string(out), "\n")
+		for _, line := range lines {
+			parts := strings.Fields(line)
+			if len(parts) >= 4 {
+				// The title is everything from the 4th field onwards
+				titles = append(titles, strings.Join(parts[3:], " "))
+			}
+		}
+		return []byte(strings.Join(titles, "\n")), nil
+	case "activate_window":
+		if isWayland { return nil, fmt.Errorf("activate_window is blocked by Wayland security model") }
+		return exec.Command("wmctrl", "-a", text).CombinedOutput()
+	case "close_window":
+		if isWayland { return nil, fmt.Errorf("close_window is blocked by Wayland security model") }
+		return exec.Command("wmctrl", "-c", text).CombinedOutput()
+	case "move_window":
+		if isWayland { return nil, fmt.Errorf("move_window is blocked by Wayland security model") }
+		return exec.Command("wmctrl", "-r", text, "-e", fmt.Sprintf("0,%d,%d,-1,-1", x, y)).CombinedOutput()
+	case "resize_window":
+		if isWayland { return nil, fmt.Errorf("resize_window is blocked by Wayland security model") }
+		return exec.Command("wmctrl", "-r", text, "-e", fmt.Sprintf("0,-1,-1,%d,%d", x, y)).CombinedOutput()
+	case "mouse_move":
+		if isWayland {
+			return exec.Command("ydotool", "mousemove", "-x", fmt.Sprintf("%d", x), "-y", fmt.Sprintf("%d", y)).CombinedOutput()
+		}
+		return exec.Command("xdotool", "mousemove", fmt.Sprintf("%d", x), fmt.Sprintf("%d", y)).CombinedOutput()
+	case "left_click":
+		if isWayland {
+			return exec.Command("ydotool", "click", "0xC0").CombinedOutput()
+		}
+		return exec.Command("xdotool", "click", "1").CombinedOutput()
+	case "right_click":
+		if isWayland {
+			return exec.Command("ydotool", "click", "0xC1").CombinedOutput()
+		}
+		return exec.Command("xdotool", "click", "3").CombinedOutput()
+	case "double_click":
+		if isWayland {
+			exec.Command("ydotool", "click", "0xC0").Run()
+			return exec.Command("ydotool", "click", "0xC0").CombinedOutput()
+		}
+		return exec.Command("xdotool", "click", "--repeat", "2", "1").CombinedOutput()
+	case "type":
+		if isWayland {
+			return exec.Command("ydotool", "type", text).CombinedOutput()
+		}
+		return exec.Command("xdotool", "type", text).CombinedOutput()
+	case "key":
+		if isWayland {
+			return exec.Command("ydotool", "key", text).CombinedOutput()
+		}
+		return exec.Command("xdotool", "key", text).CombinedOutput()
+	case "screenshot":
+		tmpFile := fmt.Sprintf("/tmp/rasnuos_screenshot_%d.png", time.Now().UnixNano())
+		defer os.Remove(tmpFile)
+		
+		if isWayland {
+			err := exec.Command("grim", tmpFile).Run()
+			if err != nil {
+				return nil, fmt.Errorf("grim failed (is it installed for Wayland screenshots?): %w", err)
+			}
+		} else {
+			// Try scrot first
+			err := exec.Command("scrot", "-z", tmpFile).Run()
+			if err != nil {
+				// Fallback to ImageMagick's import
+				err = exec.Command("import", "-window", "root", tmpFile).Run()
+				if err != nil {
+					return nil, fmt.Errorf("failed to take screenshot (ensure scrot or imagemagick is installed): %w", err)
+				}
+			}
+		}
+		data, err := os.ReadFile(tmpFile)
+		return data, err
+	default:
+		return nil, fmt.Errorf("unknown computer action: %s", action)
+	}
+}
+
+func (l *LinuxAdapter) GetMachineID() string {
+	b, err := os.ReadFile("/etc/machine-id")
+	if err == nil && len(b) > 0 {
+		return strings.TrimSpace(string(b))
+	}
+	b, err = os.ReadFile("/var/lib/dbus/machine-id")
+	if err == nil && len(b) > 0 {
+		return strings.TrimSpace(string(b))
+	}
+	return ""
+}
+
+func (a *LinuxAdapter) setupDisplayEnvironment() bool {
+	// If it's wayland, return true. Otherwise X11 return false.
+	if os.Getenv("WAYLAND_DISPLAY") != "" || os.Getenv("XDG_SESSION_TYPE") == "wayland" {
+		return true // Wayland
+	}
+
+	if os.Getenv("DISPLAY") == "" {
+		// Scan for display
+		displays, _ := filepath.Glob("/tmp/.X11-unix/X*")
+		if len(displays) > 0 {
+			displayNum := strings.TrimPrefix(filepath.Base(displays[0]), "X")
+			os.Setenv("DISPLAY", ":"+displayNum)
+		} else {
+			os.Setenv("DISPLAY", ":0")
+		}
+	}
+
+	if os.Getenv("XAUTHORITY") == "" {
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			authPath := filepath.Join(homeDir, ".Xauthority")
+			if _, err := os.Stat(authPath); err == nil {
+				os.Setenv("XAUTHORITY", authPath)
+			}
+		}
+	}
+	
+	return false // X11
 }

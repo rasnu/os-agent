@@ -80,6 +80,9 @@ func (c *PusherClient) collectAndSendMetrics() {
 		}
 	}
 
+	// PROACTIVE AUTO-HEALING: Check metrics for severe spikes
+	c.checkAlerts(metrics)
+
 	payload := MetricsPayload{
 		ServerID:     c.ServerID,
 		AgentVersion: version,

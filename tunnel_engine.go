@@ -9,6 +9,8 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -102,10 +104,19 @@ func (c *PusherClient) prepareTunnelHost(pipelineId, stepId, token string, reque
 	var sslWarning string
 
 	if useNativeSSL && domain != "" {
-		// Use the agent's home directory (e.g., ~/.rasnuos-agent/certs) for caching Let's Encrypt certificates
-		// This is CRITICAL to avoid hitting Let's Encrypt rate limits on tunnel restart!
-		cacheDir := ".rasnuos-certs"
-		
+		// Use an absolute, OS-aware path for the Let's Encrypt cert cache.
+		// A relative path would resolve to the process CWD, which on Windows
+		// (SYSTEM account) is C:\Windows\System32 — completely wrong.
+		var cacheDir string
+		if baseDir, err := os.UserCacheDir(); err == nil {
+			cacheDir = filepath.Join(baseDir, "rasnuos-agent", "acme")
+		} else {
+			// Fallback: use the OS temp directory — always writable.
+			cacheDir = filepath.Join(os.TempDir(), "rasnuos-acme")
+		}
+		os.MkdirAll(cacheDir, 0700)
+		log.Printf("[SSL] Using Let's Encrypt cache dir: %s", cacheDir)
+
 		m := &autocert.Manager{
 			Prompt:     autocert.AcceptTOS,
 			HostPolicy: autocert.HostWhitelist(domain),

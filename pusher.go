@@ -16,6 +16,7 @@ import (
 	"rasnuos-agent/os_adapter"
 	"regexp"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,19 +39,21 @@ type PusherClientEvent struct {
 }
 
 type PusherClient struct {
-	ServerURL      string
-	ApiURL         string
-	Token          string
-	ServerID       string
-	TLSPin         string
-	conn           *websocket.Conn
-	done           chan struct{}
-	writeMutex     sync.Mutex
-	wg             sync.WaitGroup
-	activeCommands map[string]context.CancelFunc
-	cmdMutex       sync.Mutex
-	cmdSemaphore   chan struct{} // Limits concurrent command execution
-	closed         bool          // Prevents write-after-close panics
+	ServerURL        string
+	ApiURL           string
+	Token            string
+	ServerID         string
+	TLSPin           string
+	conn             *websocket.Conn
+	done             chan struct{}
+	writeMutex       sync.Mutex
+	wg               sync.WaitGroup
+	activeCommands   map[string]context.CancelFunc
+	cmdMutex         sync.Mutex
+	cmdSemaphore     chan struct{} // Limits concurrent command execution
+	closed           bool         // Prevents write-after-close panics
+	hasConnectedOnce bool         // True after the first successful connection; used to distinguish reconnects from initial connects
+	logTailer        *LogTailer   // Background Log Tailing Engine
 }
 
 type PusherMessage struct {
@@ -64,8 +67,8 @@ const (
 )
 
 type PusherDataString struct {
-	Event string `json:"event"`
-	Data  string `json:"data"` // Pusher sends payload data as a stringified JSON
+	Event string          `json:"event"`
+	Data  json.RawMessage `json:"data"` // Handles both stringified JSON (Pusher) and raw objects (Reverb)
 }
 
 func NewPusherClient(serverURL, apiURL, token, serverId, tlsPin string) *PusherClient {
@@ -77,6 +80,7 @@ func NewPusherClient(serverURL, apiURL, token, serverId, tlsPin string) *PusherC
 		TLSPin:         tlsPin,
 		activeCommands: make(map[string]context.CancelFunc),
 		cmdSemaphore:   make(chan struct{}, MaxConcurrentCommands),
+		logTailer:      NewLogTailer(apiURL, token, serverId),
 	}
 }
 
@@ -164,18 +168,30 @@ func (c *PusherClient) monitorConnection(shutdownChan chan struct{}) {
 	ticker := time.NewTicker(monitorTickerDuration)
 	defer ticker.Stop()
 	failures := 0
+	heartbeatFailures := 0
 
 	for {
 		select {
 		case <-c.done:
 			log.Println("Connection closed, exiting monitor")
+			SetWSConnected(false)
 			return
 		case <-shutdownChan:
 			log.Println("Graceful shutdown initiated, closing connection")
 			c.Close()
 			return
 		case <-ticker.C:
-			go c.sendHeartbeat()
+			hbErr := c.sendHeartbeatWithStatus()
+			if hbErr != nil {
+				heartbeatFailures++
+				if heartbeatFailures >= 3 {
+					log.Printf("3 consecutive heartbeat HTTP failures — network likely down, forcing WebSocket reconnect")
+					c.Close()
+					return
+				}
+			} else {
+				heartbeatFailures = 0
+			}
 
 			if err := c.safeWriteMessage(websocket.PingMessage, []byte{}); err != nil {
 				log.Printf("Ping failed: %v", err)
@@ -193,30 +209,55 @@ func (c *PusherClient) monitorConnection(shutdownChan chan struct{}) {
 }
 
 // safeWriteMessage writes a raw WebSocket message. Safe for concurrent use.
+// Sets a 10-second write deadline to detect half-dead TCP connections.
 func (c *PusherClient) safeWriteMessage(messageType int, data []byte) error {
 	c.writeMutex.Lock()
 	defer c.writeMutex.Unlock()
 	if c.closed || c.conn == nil {
 		return fmt.Errorf("connection closed")
 	}
-	return c.conn.WriteMessage(messageType, data)
+	c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	err := c.conn.WriteMessage(messageType, data)
+	c.conn.SetWriteDeadline(time.Time{}) // Clear deadline after write
+	return err
 }
 
 // safeWriteJSON writes a JSON WebSocket message. Safe for concurrent use.
+// Sets a 10-second write deadline to detect half-dead TCP connections.
 func (c *PusherClient) safeWriteJSON(v interface{}) error {
 	c.writeMutex.Lock()
 	defer c.writeMutex.Unlock()
 	if c.closed || c.conn == nil {
 		return fmt.Errorf("connection closed")
 	}
-	return c.conn.WriteJSON(v)
+	c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	err := c.conn.WriteJSON(v)
+	c.conn.SetWriteDeadline(time.Time{}) // Clear deadline after write
+	return err
 }
 
-// parseEventData unmarshals stringified JSON event payloads, returning nil on failure.
-func parseEventData(eventName, rawData string) map[string]interface{} {
+// parseEventData unmarshals event payloads (which may be stringified JSON or raw objects).
+func parseEventData(eventName string, rawData json.RawMessage) map[string]interface{} {
+	if len(rawData) == 0 || string(rawData) == "null" {
+		return nil
+	}
+
+	// Try unmarshaling as a string first (Pusher standard behavior)
+	var strData string
+	if err := json.Unmarshal(rawData, &strData); err == nil {
+		// If it's a string, we unmarshal the inner JSON string
+		var payload map[string]interface{}
+		if err := json.Unmarshal([]byte(strData), &payload); err != nil {
+			log.Printf("Failed to parse %s inner data: %v (raw: %.200s)", eventName, err, strData)
+			return nil
+		}
+		return payload
+	}
+
+	// If it's not a string, try unmarshaling directly as an object (Reverb behavior)
 	var payload map[string]interface{}
-	if err := json.Unmarshal([]byte(rawData), &payload); err != nil {
-		log.Printf("Failed to parse %s data: %v (raw: %.200s)", eventName, err, rawData)
+	if err := json.Unmarshal(rawData, &payload); err != nil {
+		log.Printf("Failed to parse %s data directly: %v (raw: %.200s)", eventName, err, string(rawData))
 		return nil
 	}
 	return payload
@@ -272,9 +313,11 @@ func (c *PusherClient) readPump() {
 
 		var pm PusherDataString
 		if err := json.Unmarshal(message, &pm); err != nil {
-			log.Printf("Failed to unmarshal message: %s", message)
+			log.Printf("Failed to unmarshal message: %s", string(message))
 			continue
 		}
+
+		log.Printf("Received Pusher Event: '%s'", pm.Event)
 
 		switch pm.Event {
 		case "pusher:connection_established":
@@ -290,7 +333,15 @@ func (c *PusherClient) readPump() {
 			}
 			log.Printf("Connection established. Socket ID: %s", socketID)
 			c.subscribe(socketID)
-
+			SetWSConnected(true) // Milestone 3.3: update Prometheus gauge
+			// Only broadcast reconnected on actual reconnects (not the very first connect).
+			// On first connect, terminals are not yet open so the event would be spurious
+			// and would print [↻] Agent reconnected in every terminal immediately.
+			if c.hasConnectedOnce {
+				go c.broadcastReconnected()
+				TrackWSReconnect() // Milestone 3.3: count reconnect events
+			}
+			c.hasConnectedOnce = true
 		case "pusher:ping":
 			c.sendMessage(PusherMessage{Event: "pusher:pong"})
 
@@ -323,9 +374,26 @@ func (c *PusherClient) readPump() {
 			stepId := getString(payload, "step_id")
 			command := getString(payload, "command")
 			runAsUser := getString(payload, "run_as_user")
+			timeoutSeconds := int(getFloat(payload, "timeout_seconds"))
 
 			if stepId == "" || command == "" {
 				log.Printf("ExecuteCommand missing step_id or command, skipping")
+				continue
+			}
+
+			if strings.HasPrefix(strings.TrimSpace(command), "[COMPUTER_INTENT]") {
+				log.Printf("Received Computer Intent for pipeline %s, step %s", pipelineId, stepId)
+				c.runCommand(func() {
+					c.executeComputerIntent(pipelineId, stepId, command)
+				})
+				continue
+			}
+
+			if strings.HasPrefix(strings.TrimSpace(command), "[IDE_INTENT]") {
+				log.Printf("Received IDE Intent for pipeline %s, step %s", pipelineId, stepId)
+				c.runCommand(func() {
+					c.executeIdeIntent(pipelineId, stepId, command)
+				})
 				continue
 			}
 
@@ -334,12 +402,15 @@ func (c *PusherClient) readPump() {
 			// Enforce concurrency limit — reject if at capacity
 			select {
 			case c.cmdSemaphore <- struct{}{}:
+				TrackCommandStart() // Bug 8 fix: populate Prometheus counters
 				c.runCommand(func() {
 					defer func() { <-c.cmdSemaphore }()
-					c.executeAndStream(pipelineId, stepId, command, runAsUser)
+					defer TrackCommandFinish() // decrement active commands gauge
+					c.executeAndStream(pipelineId, stepId, command, runAsUser, timeoutSeconds)
 				})
 			default:
 				log.Printf("Command rejected for pipeline %s, step %s: max concurrency (%d) reached", pipelineId, stepId, MaxConcurrentCommands)
+				TrackCommandError() // count rejected commands as errors for alerting
 				c.sendCompletion(pipelineId, stepId, false, fmt.Sprintf("Agent rejected: maximum concurrent commands (%d) reached. Try again shortly.", MaxConcurrentCommands))
 			}
 
@@ -379,7 +450,7 @@ func (c *PusherClient) readPump() {
 			log.Printf("Received discovery request")
 			c.runCommand(func() { c.executeDiscovery(script) })
 
-		case "AgentCommandIssued":
+		case "AgentCommandIssued", "App\\Events\\AgentCommandIssued":
 			payload := parseEventData("AgentCommandIssued", pm.Data)
 			if payload == nil {
 				continue
@@ -397,7 +468,7 @@ func (c *PusherClient) readPump() {
 				if action != "" {
 					c.runCommand(func() { c.handleFileCommand(action, args) })
 				}
-			case "list-directory", "read-file", "write-file", "delete-path", "create-directory", "rename-path", "chmod-path", "chown-path":
+			case "list-directory", "read-file", "write-file", "write-files", "delete-path", "create-directory", "rename-path", "chmod-path", "chown-path":
 				c.runCommand(func() { c.handleFileCommand(command, args) })
 			case "execute-migration-command":
 				action := getString(args, "action")
@@ -409,7 +480,7 @@ func (c *PusherClient) readPump() {
 				if action != "" {
 					c.runCommand(func() { c.handleTunnelCommand(action, args) })
 				}
-			case "execute-command", "restart-service", "start-service", "stop-service", "kill-process", "sync-cron-jobs", "upload-file-to-dashboard", "download-file-from-dashboard":
+			case "execute-command", "pty-execute", "pty-input", "restart-service", "start-service", "stop-service", "kill-process", "sync-cron-jobs", "upload-file-to-dashboard", "download-file-from-dashboard":
 				c.runCommand(func() { c.handleAgentCommand(command, args) })
 			default:
 				log.Printf("Unknown AgentCommandIssued command: %s", command)
@@ -422,7 +493,7 @@ func (c *PusherClient) readPump() {
 			}
 			termID := getString(payload, "term_id")
 			if termID != "" {
-				c.runCommand(func() { c.StartTerminal(termID) })
+				c.runCommand(func() { c.StartTerminal(termID, false, "") })
 			}
 
 		case "client-TerminalInput":
@@ -466,11 +537,30 @@ func (c *PusherClient) readPump() {
 			termID := getString(payload, "term_id")
 
 			if termID != "" {
+				// DEADLOCK FIX: client-TerminalStop previously called session.Close() while
+				// holding sessionMutex. But Close() also tries to acquire sessionMutex to
+				// remove itself from activeSessions → permanent mutex deadlock → readPump
+				// goroutine was stuck → WebSocket died → heartbeats failed → reconnect loop.
+				// Fix: delete from map and close internal PTY directly (no recursive lock needed).
 				sessionMutex.Lock()
-				if session, exists := activeSessions[termID]; exists {
-					session.Close()
+				session, exists := activeSessions[termID]
+				if exists {
+					delete(activeSessions, termID)
 				}
 				sessionMutex.Unlock()
+
+				if exists {
+					session.mu.Lock()
+					if !session.isClosed {
+						session.isClosed = true
+						if session.tickerStop != nil {
+							close(session.tickerStop)
+						}
+					}
+					session.mu.Unlock()
+					session.closeInternal()
+					log.Printf("Terminal session %s stopped by client", termID)
+				}
 			}
 
 		default:
@@ -507,7 +597,61 @@ func (c *PusherClient) handleAgentCommand(command string, args map[string]interf
 		}
 
 		log.Printf("Executing raw command: %s (User: %s)", cmdStr, runAsUser)
-		c.runCommand(func() { c.executeRawCommand(requestId, cmdStr, runAsUser) })
+		
+		// Check if this is a specialized intent wrapper instead of a raw shell command
+		if strings.HasPrefix(cmdStr, "[COMPUTER_INTENT]") {
+			c.runCommand(func() { c.executeComputerIntent("sync", requestId, cmdStr) })
+		} else if strings.HasPrefix(cmdStr, "[IDE_INTENT]") {
+			c.runCommand(func() { c.executeIdeIntent("sync", requestId, cmdStr) })
+		} else {
+			c.runCommand(func() { c.executeRawCommand(requestId, cmdStr, runAsUser) })
+		}
+
+	case "pty-execute":
+		cmdStr := getString(args, "command")
+		requestId := getString(args, "request_id")
+
+		if cmdStr == "" || requestId == "" {
+			errMsg = "command and request_id are required"
+			break
+		}
+
+		log.Printf("Executing interactive PTY command: %s", cmdStr)
+		c.runCommand(func() {
+			session := c.StartTerminal(requestId, true, requestId)
+			if session != nil {
+				session.Write([]byte(cmdStr + "\n"))
+			} else {
+				c.sendMigrationCompletion(requestId, requestId, false, "Failed to start PTY session", nil)
+			}
+		})
+
+	case "pty-input":
+		input := getString(args, "input")
+		termId := getString(args, "term_id")
+		requestId := getString(args, "request_id")
+
+		if input == "" || termId == "" || requestId == "" {
+			errMsg = "input, term_id, and request_id are required"
+			break
+		}
+
+		log.Printf("Sending PTY input to %s", termId)
+		c.runCommand(func() {
+			sessionMutex.Lock()
+			session, exists := activeSessions[termId]
+			sessionMutex.Unlock()
+
+			if exists {
+				session.mu.Lock()
+				session.currentRequestID = requestId
+				session.isStalled = false
+				session.mu.Unlock()
+				session.Write([]byte(input))
+			} else {
+				c.sendMigrationCompletion(requestId, requestId, false, "PTY session expired or not found", nil)
+			}
+		})
 
 	case "upload-file-to-dashboard":
 		path := getString(args, "path")
@@ -674,6 +818,24 @@ func (c *PusherClient) authenticateChannel(socketID, channelName string) (string
 	return authResp["auth"], nil
 }
 
+// broadcastReconnected notifies the frontend that the agent WebSocket has
+// (re)connected. The browser uses this to re-send client-TerminalStart for any
+// terminal sessions that were active when the connection dropped.
+// A brief delay ensures the channel subscriptions are confirmed before we fire.
+func (c *PusherClient) broadcastReconnected() {
+	time.Sleep(500 * time.Millisecond)
+	payload := PusherClientEvent{
+		Event:   "client-agent-reconnected",
+		Channel: fmt.Sprintf("private-server.%s.terminal", c.ServerID),
+		Data:    `{"reconnected":true}`,
+	}
+	if err := c.safeWriteJSON(payload); err != nil {
+		log.Printf("Failed to broadcast agent-reconnected: %v", err)
+	} else {
+		log.Printf("Broadcast client-agent-reconnected on terminal channel")
+	}
+}
+
 func (c *PusherClient) sendMessage(msg PusherMessage) {
 	if err := c.safeWriteJSON(msg); err != nil {
 		log.Println("write error:", err)
@@ -696,7 +858,9 @@ func (c *PusherClient) Close() {
 	c.conn.Close()
 }
 
-func (c *PusherClient) sendHeartbeat() {
+// sendHeartbeatWithStatus sends the heartbeat and returns an error if the HTTP call fails.
+// Used by monitorConnection to detect network-level outages that the WebSocket ping cannot detect.
+func (c *PusherClient) sendHeartbeatWithStatus() error {
 	heartbeatURL := fmt.Sprintf("%s/agent/heartbeat", c.ApiURL)
 
 	reqBody, err := json.Marshal(map[string]interface{}{
@@ -704,15 +868,16 @@ func (c *PusherClient) sendHeartbeat() {
 		"agent_version": version,
 		"os_type":       runtime.GOOS,
 		"cpu_arch":      runtime.GOARCH,
+		"machine_id":    os_adapter.Current().GetMachineID(),
 	})
 	if err != nil {
 		log.Printf("Error marshaling heartbeat: %v", err)
-		return
+		return err
 	}
 
 	req, err := http.NewRequest("POST", heartbeatURL, bytes.NewBuffer(reqBody))
 	if err != nil {
-		return
+		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -720,11 +885,57 @@ func (c *PusherClient) sendHeartbeat() {
 	req.Header.Set("Authorization", "Bearer "+c.Token)
 
 	resp, err := heartbeatHTTPClient.Do(req)
-	if err == nil {
-		resp.Body.Close()
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	var res map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
+		if logs, ok := res["monitored_logs"].([]interface{}); ok {
+			var strLogs []string
+			for _, l := range logs {
+				if str, isStr := l.(string); isStr {
+					strLogs = append(strLogs, str)
+				}
+			}
+			if c.logTailer != nil {
+				c.logTailer.UpdateMonitoredLogs(strLogs)
+			}
+		}
+	}
+	return nil
+}
+
+// sendHeartbeat is a fire-and-forget wrapper for backward compatibility.
+func (c *PusherClient) sendHeartbeat() {
+	c.sendHeartbeatWithStatus()
+}
+
+// CancelAllCommands immediately cancels every in-flight shell command context.
+// PTY sessions are already closed by CleanupIdleSessions via shutdownChan.
+func (c *PusherClient) CancelAllCommands() {
+	c.cmdMutex.Lock()
+	defer c.cmdMutex.Unlock()
+	for stepId, cancel := range c.activeCommands {
+		log.Printf("Cancelling in-flight command for step %s due to shutdown", stepId)
+		cancel()
 	}
 }
 
+// WaitCommands waits for all goroutines to finish, with a hard 10-second deadline.
+// If the deadline expires, we log a warning and return so systemd doesn't SIGKILL us.
 func (c *PusherClient) WaitCommands() {
-	c.wg.Wait()
+	done := make(chan struct{})
+	go func() {
+		c.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Println("All commands finished cleanly.")
+	case <-time.After(10 * time.Second):
+		log.Println("Shutdown deadline exceeded (10s). Forcing exit — some commands may not have finished cleanly.")
+	}
 }

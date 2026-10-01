@@ -18,6 +18,7 @@ import (
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/load"
 	"github.com/shirou/gopsutil/v3/mem"
+	net_util "github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 )
 
@@ -49,13 +50,31 @@ func (a *MacOSAdapter) GetMetrics() (Metrics, []error) {
 		metrics.DiskUsage = val
 	}
 
-	// MacOS swap usage
-	metrics.SwapUsage = 0.0
+	// macOS Swap usage (compressed memory)
+	if swapMem, err := mem.SwapMemory(); err != nil {
+		errs = append(errs, fmt.Errorf("swap: %w", err))
+	} else if swapMem.Total > 0 {
+		metrics.SwapUsage = swapMem.UsedPercent
+	}
 
 	if val, err := getLoadAvg(); err != nil {
 		errs = append(errs, fmt.Errorf("load: %w", err))
 	} else {
 		metrics.LoadAvg = val
+	}
+
+	if rx, tx, err := getMacNetworkIO(); err != nil {
+		errs = append(errs, fmt.Errorf("network_io: %w", err))
+	} else {
+		metrics.NetworkRX = rx
+		metrics.NetworkTX = tx
+	}
+
+	if read, write, err := getMacDiskIO(); err != nil {
+		errs = append(errs, fmt.Errorf("disk_io: %w", err))
+	} else {
+		metrics.DiskRead = read
+		metrics.DiskWrite = write
 	}
 
 	if processes, err := getTopProcesses(); err != nil {
@@ -74,11 +93,20 @@ func (a *MacOSAdapter) GetMetrics() (Metrics, []error) {
 }
 
 func (a *MacOSAdapter) GetShellCmd(ctx context.Context, script string, runAsUser string) *exec.Cmd {
+	var cmd *exec.Cmd
 	if runAsUser != "" {
-		// macOS su supports similar syntax to linux
-		return exec.CommandContext(ctx, "su", "-s", "/bin/bash", runAsUser, "-c", script)
+		// MacOS su behaves similarly, but we use -s to force bash
+		cmd = exec.CommandContext(ctx, "su", "-s", "/bin/bash", runAsUser, "-c", script)
+	} else {
+		cmd = exec.CommandContext(ctx, "bash", "-c", script)
 	}
-	return exec.CommandContext(ctx, "bash", "-c", script)
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
+
+	return cmd
 }
 
 func (a *MacOSAdapter) StartPTY(cols, rows uint16) (PTY, error) {
@@ -207,6 +235,29 @@ func getLoadAvg() (string, error) {
 	return fmt.Sprintf("%.2f, %.2f, %.2f", l.Load1, l.Load5, l.Load15), nil
 }
 
+// getMacNetworkIO sums bytes received/sent across all non-loopback interfaces.
+func getMacNetworkIO() (uint64, uint64, error) {
+	counters, err := net_util.IOCounters(false)
+	if err != nil || len(counters) == 0 {
+		return 0, 0, err
+	}
+	return counters[0].BytesRecv, counters[0].BytesSent, nil
+}
+
+// getMacDiskIO sums read/write bytes across all disk devices and converts to KB.
+func getMacDiskIO() (uint64, uint64, error) {
+	counters, err := disk.IOCounters()
+	if err != nil {
+		return 0, 0, err
+	}
+	var read, write uint64
+	for _, c := range counters {
+		read += c.ReadBytes / 1024
+		write += c.WriteBytes / 1024
+	}
+	return read, write, nil
+}
+
 func getTopProcesses() ([]Process, error) {
 	var result []Process
 	procs, err := process.Processes()
@@ -280,10 +331,160 @@ func getServiceStatuses() ([]ServiceStatus, error) {
 }
 
 func (a *MacOSAdapter) PunchFirewallHole(port int) error {
-	// macOS application firewall handles this via GUI prompts for the binary
+	// macOS pf configuration is complex to automate safely without a full ruleset manager.
+	// Often ignored for simple agent deployments unless strictly necessary.
 	return nil
 }
 
 func (a *MacOSAdapter) CloseFirewallHole(port int) error {
 	return nil
+}
+
+func (a *MacOSAdapter) ExecuteComputerAction(action, text string, x, y int) ([]byte, error) {
+	switch action {
+	case "open_application":
+		app := text
+		switch strings.ToLower(text) {
+		case "terminal":
+			app = "Terminal.app"
+		case "file manager", "explorer":
+			app = "Finder.app"
+		case "browser":
+			app = "Safari.app"
+		}
+
+		var cmd *exec.Cmd
+		if app == "Finder.app" && (strings.ToLower(text) == "file manager" || strings.ToLower(text) == "explorer") {
+			homeDir, _ := os.UserHomeDir()
+			cmd = exec.Command("open", homeDir)
+		} else if app == "Safari.app" && strings.ToLower(text) == "browser" {
+			cmd = exec.Command("open", "https://google.com")
+		} else {
+			cmd = exec.Command("open", "-a", app)
+		}
+
+		err := cmd.Start()
+		if err != nil {
+			return nil, fmt.Errorf("failed to open application %s: %w", text, err)
+		}
+		go func() {
+			cmd.Wait()
+		}()
+
+		return []byte(fmt.Sprintf("Launched %s successfully", text)), nil
+	case "list_windows":
+		script := `
+set windowList to ""
+tell application "System Events"
+	repeat with p in (every process whose visible is true)
+		set wNames to name of every window of p
+		repeat with wName in wNames
+			if wName is not missing value and wName is not "" then
+				set windowList to windowList & wName & linefeed
+			end if
+		end repeat
+	end repeat
+end tell
+return windowList`
+		return exec.Command("osascript", "-e", script).CombinedOutput()
+	case "activate_window":
+		safeText := strings.ReplaceAll(text, `\`, `\\`)
+		safeText = strings.ReplaceAll(safeText, `"`, `\"`)
+		script := fmt.Sprintf(`
+tell application "System Events"
+	set targetTitle to "%s"
+	repeat with p in (every process whose visible is true)
+		if exists (window 1 of p whose name is targetTitle) then
+			set frontmost of p to true
+			tell p to perform action "AXRaise" of (window 1 whose name is targetTitle)
+			exit repeat
+		end if
+	end repeat
+end tell`, safeText)
+		return exec.Command("osascript", "-e", script).CombinedOutput()
+	case "close_window":
+		safeText := strings.ReplaceAll(text, `\`, `\\`)
+		safeText = strings.ReplaceAll(safeText, `"`, `\"`)
+		script := fmt.Sprintf(`
+tell application "System Events"
+	set targetTitle to "%s"
+	repeat with p in (every process whose visible is true)
+		if exists (window 1 of p whose name is targetTitle) then
+			tell p to click button 1 of (window 1 whose name is targetTitle)
+			exit repeat
+		end if
+	end repeat
+end tell`, safeText)
+		return exec.Command("osascript", "-e", script).CombinedOutput()
+	case "move_window":
+		safeText := strings.ReplaceAll(text, `\`, `\\`)
+		safeText = strings.ReplaceAll(safeText, `"`, `\"`)
+		script := fmt.Sprintf(`
+tell application "System Events"
+	set targetTitle to "%s"
+	repeat with p in (every process whose visible is true)
+		if exists (window 1 of p whose name is targetTitle) then
+			set position of (window 1 of p whose name is targetTitle) to {%d, %d}
+			exit repeat
+		end if
+	end repeat
+end tell`, safeText, x, y)
+		return exec.Command("osascript", "-e", script).CombinedOutput()
+	case "resize_window":
+		safeText := strings.ReplaceAll(text, `\`, `\\`)
+		safeText = strings.ReplaceAll(safeText, `"`, `\"`)
+		script := fmt.Sprintf(`
+tell application "System Events"
+	set targetTitle to "%s"
+	repeat with p in (every process whose visible is true)
+		if exists (window 1 of p whose name is targetTitle) then
+			set size of (window 1 of p whose name is targetTitle) to {%d, %d}
+			exit repeat
+		end if
+	end repeat
+end tell`, safeText, x, y)
+		return exec.Command("osascript", "-e", script).CombinedOutput()
+	case "mouse_move":
+		return exec.Command("cliclick", fmt.Sprintf("m:%d,%d", x, y)).CombinedOutput()
+	case "left_click":
+		return exec.Command("cliclick", "c:.").CombinedOutput()
+	case "right_click":
+		return exec.Command("cliclick", "rc:.").CombinedOutput()
+	case "double_click":
+		return exec.Command("cliclick", "dc:.").CombinedOutput()
+	case "type":
+		// Securely escape AppleScript string to prevent injection
+		safeText := strings.ReplaceAll(text, `\`, `\\`)
+		safeText = strings.ReplaceAll(safeText, `"`, `\"`)
+		script := fmt.Sprintf(`tell application "System Events" to keystroke "%s"`, safeText)
+		return exec.Command("osascript", "-e", script).CombinedOutput()
+	case "key":
+		return exec.Command("cliclick", fmt.Sprintf("kp:%s", text)).CombinedOutput()
+	case "screenshot":
+		tmpFile := fmt.Sprintf("/tmp/rasnuos_screenshot_%d.png", time.Now().UnixNano())
+		defer os.Remove(tmpFile)
+		err := exec.Command("screencapture", "-x", tmpFile).Run()
+		if err != nil {
+			return nil, fmt.Errorf("failed to take screenshot: %w", err)
+		}
+		data, err := os.ReadFile(tmpFile)
+		return data, err
+	default:
+		return nil, fmt.Errorf("unknown computer action: %s", action)
+	}
+}
+
+func (a *MacOSAdapter) GetMachineID() string {
+	out, err := exec.Command("ioreg", "-rd1", "-c", "IOPlatformExpertDevice").Output()
+	if err == nil {
+		for _, line := range strings.Split(string(out), "\n") {
+			if strings.Contains(line, "IOPlatformUUID") {
+				parts := strings.Split(line, "=")
+				if len(parts) == 2 {
+					return strings.Trim(strings.TrimSpace(parts[1]), "\"")
+				}
+			}
+		}
+	}
+	return ""
 }

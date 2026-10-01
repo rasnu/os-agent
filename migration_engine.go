@@ -20,12 +20,23 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
 
 	"rasnuos-agent/os_adapter"
 )
+
+// platformShellCmd returns an exec.Cmd that runs the given script via the
+// appropriate shell for the current OS. It uses the package-level execCommand
+// variable so that it can be mocked in tests.
+func platformShellCmd(script string) *exec.Cmd {
+	if runtime.GOOS == "windows" {
+		return execCommand("powershell", "-NoProfile", "-NonInteractive", "-Command", script)
+	}
+	return execCommand("bash", "-c", script)
+}
 
 type MigrationServer struct {
 	listener    net.Listener
@@ -453,6 +464,12 @@ func (c *PusherClient) sendMigrationCompletion(pipelineId, stepId string, succes
 // P2P STREAM RECEIVER (mTLS Tunnel)
 // ---------------------------------------------------------
 func (c *PusherClient) prepareP2pReceiver(pipelineId, stepId, receiveCmd, token string, requestedPort int) {
+	// Cross-platform guard: rsync is not available on Windows.
+	if runtime.GOOS == "windows" {
+		c.sendMigrationCompletion(pipelineId, stepId, false, "P2P migration via rsync is not supported on Windows. The source/destination servers must be Linux or macOS.", nil)
+		return
+	}
+
 	cert, _, err := generateSelfSignedCert()
 	if err != nil {
 		c.sendMigrationCompletion(pipelineId, stepId, false, fmt.Sprintf("Failed to generate cert: %v", err), nil)
@@ -511,7 +528,9 @@ func (c *PusherClient) prepareP2pReceiver(pipelineId, stepId, receiveCmd, token 
 		}
 
 		// Execute the receive command
-		cmd := execCommand("sh", "-c", receiveCmd)
+		// Use the OS-appropriate shell (PowerShell on Windows, bash on Linux/macOS).
+		// Uses execCommand so that it can be mocked in tests.
+		cmd := platformShellCmd(receiveCmd)
 		ms.cmd = cmd
 
 		// Pipe the network connection directly into cmd.Stdin
@@ -576,6 +595,12 @@ func (pw *progressWriter) Write(p []byte) (int, error) {
 }
 
 func (c *PusherClient) runP2pSender(pipelineId, stepId, sendCmd, host string, port int, fingerprint, token string) {
+	// Cross-platform guard: rsync is not available on Windows.
+	if runtime.GOOS == "windows" {
+		c.sendMigrationCompletion(pipelineId, stepId, false, "P2P migration via rsync is not supported on Windows. The source/destination servers must be Linux or macOS.", nil)
+		return
+	}
+
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true,
 		VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
@@ -609,7 +634,9 @@ func (c *PusherClient) runP2pSender(pipelineId, stepId, sendCmd, host string, po
 		return
 	}
 
-	cmd := execCommand("sh", "-c", sendCmd)
+	// Use the OS-appropriate shell (PowerShell on Windows, bash on Linux/macOS).
+	// Uses execCommand so that it can be mocked in tests.
+	cmd := platformShellCmd(sendCmd)
 	
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {

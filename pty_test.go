@@ -27,7 +27,10 @@ func TestStartTerminal(t *testing.T) {
 
 	termID := "test-term-1"
 
-	client.StartTerminal(termID)
+	session := client.StartTerminal(termID, true, "req-123")
+	if session == nil {
+		t.Fatal("Failed to start terminal session")
+	}
 
 	sessionMutex.Lock()
 	_, exists := activeSessions[termID]
@@ -40,7 +43,7 @@ func TestStartTerminal(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	sessionMutex.Lock()
-	session := activeSessions[termID]
+	session = activeSessions[termID]
 	sessionMutex.Unlock()
 
 	if session != nil {

@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -152,10 +153,36 @@ func (b *StreamBatcher) Close() {
 	}
 }
 
-func (c *PusherClient) executeAndStream(pipelineId string, stepId string, command string, runAsUser string) {
+func (c *PusherClient) executeAndStream(pipelineId string, stepId string, command string, runAsUser string, timeoutSeconds int) {
 
 	safeCommand := redactSecrets(command)
 	log.Printf("Executing: %s", safeCommand)
+
+	// --- PILLAR 4: Command Guardrails ---
+	destructivePatterns := []*regexp.Regexp{
+		// Linux/macOS: recursive force delete of system directories
+		regexp.MustCompile(`(?i)\brm\s+(?:-[a-z]*r[a-z]*f[a-z]*\s+|-[a-z]*f[a-z]*r[a-z]*\s+)(?:/\s*|/\*|/var|/etc|/usr|/bin|/sbin)\b`),
+		// Linux: mkfs (format a filesystem)
+		regexp.MustCompile(`(?i)\bmkfs\b`),
+		// Linux: dd zero-wipe of a device
+		regexp.MustCompile(`(?i)\bdd\s+if=/dev/zero\b`),
+		// Linux: chmod 777 on root or system paths
+		regexp.MustCompile(`(?i)\bchmod\s+(?:-[a-z]*R[a-z]*\s+)?777\s+/`),
+		// Windows: Remove-Item -Recurse -Force on drive roots or system dirs
+		regexp.MustCompile(`(?i)Remove-Item\s+.*-(?:Recurse|r)\b.*(?:[A-Za-z]:\\\\?\s*$|[A-Za-z]:\\\\Windows|[A-Za-z]:\\\\System)`),
+		// Windows: format drive command (format C: /q or format C: /y)
+		regexp.MustCompile(`(?i)\bformat\s+[A-Za-z]:\s*(?:/|\z)`),
+	}
+
+	for _, re := range destructivePatterns {
+		if re.MatchString(command) {
+			errMsg := fmt.Sprintf("\n[GUARDRAIL BLOCK] Destructive command matched pattern '%s' and is prohibited in Strict Mode.\n", re.String())
+			c.streamLogWS(pipelineId, stepId, errMsg, nil)
+			c.sendCompletion(pipelineId, stepId, false, errMsg)
+			return
+		}
+	}
+	// ------------------------------------
 
 	if f, err := os.OpenFile(os_adapter.Current().LogFilePath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600); err == nil {
 		f.WriteString(fmt.Sprintf("[%s] EXEC: %s\n", time.Now().Format(time.RFC3339), safeCommand))
@@ -165,7 +192,10 @@ func (c *PusherClient) executeAndStream(pipelineId string, stepId string, comman
 		f.Close()
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = 60
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
 	c.cmdMutex.Lock()
@@ -252,6 +282,7 @@ func (c *PusherClient) executeAndStream(pipelineId string, stepId string, comman
 			Command:    redactSecrets(command),
 			RunAsUser:  runAsUser,
 			Success:    true,
+			Error:      "",
 		})
 	}
 }
@@ -365,30 +396,62 @@ func (c *PusherClient) sendCompletion(pipelineId string, stepId string, success 
 		return
 	}
 
-	req, err := http.NewRequest("POST", completionURL, bytes.NewBuffer(reqBody))
-	if err != nil {
-		log.Printf("Error creating completion request: %v", err)
-		return
-	}
+	// Retry up to 3 times with exponential backoff (2s, 4s, 8s).
+	// A single network error previously caused the result to be silently dropped,
+	// permanently orphaning the step in is_executing=true on the backend.
+	maxAttempts := 3
+	backoff := 2 * time.Second
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.Token)
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		req, err := http.NewRequest("POST", completionURL, bytes.NewBuffer(reqBody))
+		if err != nil {
+			log.Printf("Error creating completion request: %v", err)
+			return
+		}
 
-	resp, err := defaultHTTPClient.Do(req)
-	if err != nil {
-		log.Printf("Error sending completion: %v", err)
-		return
-	}
-	defer resp.Body.Close()
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+c.Token)
 
-	if resp.StatusCode != http.StatusOK {
+		resp, err := defaultHTTPClient.Do(req)
+		if err != nil {
+			log.Printf("Completion attempt %d/%d failed (network error): %v", attempt, maxAttempts, err)
+			if attempt < maxAttempts {
+				time.Sleep(backoff)
+				backoff *= 2
+			}
+			continue
+		}
+
+		if resp.StatusCode == http.StatusOK {
+			resp.Body.Close()
+			log.Printf("Successfully reported completion for step %s (attempt %d)", stepId, attempt)
+			return
+		}
+
+		// 4xx errors (e.g. 400 step not in executable state, 403 auth) are not retryable
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			log.Printf("Completion rejected with status %d (not retrying): %s", resp.StatusCode, string(bodyBytes))
+			return
+		}
+
+		// 5xx: server-side transient error, retry
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		log.Printf("Completion failed with status %d: %s", resp.StatusCode, string(bodyBytes))
-	} else {
-		log.Printf("Successfully reported completion for step %s", stepId)
+		resp.Body.Close()
+		log.Printf("Completion attempt %d/%d failed with status %d: %s", attempt, maxAttempts, resp.StatusCode, string(bodyBytes))
+		if attempt < maxAttempts {
+			time.Sleep(backoff)
+			backoff *= 2
+		}
 	}
+
+	log.Printf("All %d completion attempts failed for step %s. Step may be orphaned — backend sweeper will recover it.", maxAttempts, stepId)
 }
+
+
+
 
 func (c *PusherClient) executeDiscovery(script string) {
 
@@ -490,4 +553,66 @@ func (c *PusherClient) executeRawCommand(requestId, cmdStr, runAsUser string) {
 	}
 
 	c.sendCompletion("sync", requestId, success, logMsg)
+}
+
+func (c *PusherClient) executeComputerIntent(pipelineId, stepId, commandStr string) {
+	prefix := "[COMPUTER_INTENT] "
+	if !strings.HasPrefix(commandStr, prefix) {
+		c.sendCompletion(pipelineId, stepId, false, "Invalid computer intent prefix")
+		return
+	}
+	
+	jsonStr := strings.TrimPrefix(commandStr, prefix)
+	
+	var payload struct {
+		Action     string `json:"action"`
+		Coordinate []int  `json:"coordinate"`
+		Text       string `json:"text"`
+	}
+	
+	if err := json.Unmarshal([]byte(jsonStr), &payload); err != nil {
+		c.sendCompletion(pipelineId, stepId, false, "Invalid computer intent json: "+err.Error())
+		return
+	}
+	
+	x, y := 0, 0
+	if len(payload.Coordinate) >= 2 {
+		x = payload.Coordinate[0]
+		y = payload.Coordinate[1]
+	}
+	
+	logBuf := &LogBuffer{}
+	c.streamLogWS(pipelineId, stepId, fmt.Sprintf("Executing GUI action: %s\n", payload.Action), logBuf)
+	
+	data, err := os_adapter.Current().ExecuteComputerAction(payload.Action, payload.Text, x, y)
+	
+	if err != nil {
+		c.streamLogWS(pipelineId, stepId, fmt.Sprintf("GUI action failed: %v\n", err), logBuf)
+		c.sendCompletion(pipelineId, stepId, false, logBuf.String())
+		return
+	}
+	
+	// If it's a screenshot, encode it in Base64 and wrap it in our tags so the backend parses it as a Vision image!
+	if payload.Action == "screenshot" && len(data) > 0 {
+		b64 := base64.StdEncoding.EncodeToString(data)
+		wrappedPayload := fmt.Sprintf("\n[SCREENSHOT_BASE64_START]%s[SCREENSHOT_BASE64_END]\n", b64)
+		
+		// CRITICAL: Chunk the massive base64 payload into 8KB segments.
+		// Sending a 2MB string in a single WebSocket frame will crash Pusher/Reverb!
+		chunkSize := 8000
+		for i := 0; i < len(wrappedPayload); i += chunkSize {
+			end := i + chunkSize
+			if end > len(wrappedPayload) {
+				end = len(wrappedPayload)
+			}
+			c.streamLogWS(pipelineId, stepId, wrappedPayload[i:end], logBuf)
+			// Brief pause to prevent flooding the socket buffer
+			time.Sleep(5 * time.Millisecond)
+		}
+	} else if len(data) > 0 {
+		c.streamLogWS(pipelineId, stepId, string(data)+"\n", logBuf)
+	}
+	
+	c.streamLogWS(pipelineId, stepId, "\nComputer action executed successfully.\n", logBuf)
+	c.sendCompletion(pipelineId, stepId, true, logBuf.String())
 }

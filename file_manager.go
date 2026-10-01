@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 )
 
 func (c *PusherClient) handleFileCommand(action string, args map[string]interface{}) {
@@ -22,17 +23,18 @@ func (c *PusherClient) handleFileCommand(action string, args map[string]interfac
 	stepId := getString(args, "step_id")
 	path := getString(args, "path")
 
-	if pipelineId == "" || stepId == "" || path == "" {
+	if pipelineId == "" || stepId == "" || (path == "" && action != "write-files") {
 		log.Printf("File command missing pipeline_id, step_id, or path")
 		return
 	}
 
-	if !filepath.IsAbs(path) {
-		c.sendFileCompletion(pipelineId, stepId, false, "Path must be an absolute path", nil)
-		return
+	if action != "write-files" {
+		if !filepath.IsAbs(path) {
+			c.sendFileCompletion(pipelineId, stepId, false, "Path must be an absolute path", nil)
+			return
+		}
+		path = filepath.Clean(path)
 	}
-
-	path = filepath.Clean(path)
 
 	var success bool
 	var logMsg string
@@ -65,6 +67,129 @@ func (c *PusherClient) handleFileCommand(action string, args map[string]interfac
 			logMsg = "File read successfully"
 			data = base64.StdEncoding.EncodeToString(content) // Safe JSON transport
 		}
+	case "write-files":
+		filesInter, ok := args["files"].([]interface{})
+		if !ok {
+			success = false
+			logMsg = "files argument must be an array"
+			break
+		}
+
+		txID := fmt.Sprintf("rasnuos_tx_%d", time.Now().UnixNano())
+		txBaseDir := filepath.Join(os.TempDir(), txID)
+		stagingDir := filepath.Join(txBaseDir, "staging")
+		backupDir := filepath.Join(txBaseDir, "backup")
+
+		os.MkdirAll(stagingDir, 0755)
+		os.MkdirAll(backupDir, 0755)
+		defer os.RemoveAll(txBaseDir)
+
+		type fileOp struct {
+			Target string
+			Staging string
+			Backup string
+			HasBackup bool
+			OriginalMode os.FileMode
+			NewMode os.FileMode
+		}
+		var ops []fileOp
+
+		hasError := false
+		for i, fInter := range filesInter {
+			fMap, ok := fInter.(map[string]interface{})
+			if !ok {
+				success = false
+				logMsg = fmt.Sprintf("Item %d in files array is not an object", i)
+				hasError = true
+				break
+			}
+			fPath, _ := fMap["path"].(string)
+			fContentB64, _ := fMap["content"].(string)
+			
+			if fPath == "" {
+				continue
+			}
+
+			if !filepath.IsAbs(fPath) {
+				success = false
+				logMsg = fmt.Sprintf("Path must be an absolute path: %s", fPath)
+				hasError = true
+				break
+			}
+			fPath = filepath.Clean(fPath)
+
+			fContent, err := base64.StdEncoding.DecodeString(fContentB64)
+			if err != nil {
+				success = false
+				logMsg = fmt.Sprintf("Failed to decode base64 for %s: %v", fPath, err)
+				hasError = true
+				break
+			}
+			
+			fModeStr, _ := fMap["mode"].(string)
+			var fMode os.FileMode = 0644
+			if fModeStr != "" {
+				if parsed, err := strconv.ParseUint(fModeStr, 8, 32); err == nil {
+					fMode = os.FileMode(parsed)
+				}
+			}
+
+			op := fileOp{
+				Target: fPath,
+				Staging: filepath.Join(stagingDir, fmt.Sprintf("file_%d", i)),
+				Backup: filepath.Join(backupDir, fmt.Sprintf("file_%d", i)),
+				HasBackup: false,
+				NewMode: fMode,
+			}
+
+			if stat, err := os.Stat(fPath); err == nil && !stat.IsDir() {
+				op.HasBackup = true
+				op.OriginalMode = stat.Mode()
+				if err := copyFile(fPath, op.Backup, stat.Mode()); err != nil {
+					success = false
+					logMsg = fmt.Sprintf("Failed to backup %s: %v", fPath, err)
+					hasError = true
+					break
+				}
+			}
+
+			if err := os.WriteFile(op.Staging, fContent, op.NewMode); err != nil {
+				success = false
+				logMsg = fmt.Sprintf("Failed to stage %s: %v", fPath, err)
+				hasError = true
+				break
+			}
+			ops = append(ops, op)
+		}
+
+		if hasError {
+			break
+		}
+
+		commitError := false
+		for _, op := range ops {
+			os.MkdirAll(filepath.Dir(op.Target), 0755)
+			if err := copyFile(op.Staging, op.Target, op.NewMode); err != nil {
+				success = false
+				logMsg = fmt.Sprintf("Failed to commit %s: %v", op.Target, err)
+				commitError = true
+				break
+			}
+		}
+
+		if commitError {
+			for _, op := range ops {
+				if op.HasBackup {
+					copyFile(op.Backup, op.Target, op.OriginalMode)
+				} else {
+					os.Remove(op.Target)
+				}
+			}
+			break
+		}
+
+		success = true
+		logMsg = "Successfully wrote array of files atomically"
 	case "write-file":
 		b64content := getString(args, "content")
 		content, err := base64.StdEncoding.DecodeString(b64content)
@@ -389,4 +514,20 @@ func (c *PusherClient) downloadFileFromDashboard(requestId, targetPath, download
 
 	c.sendCompletion("sync", requestId, true, fmt.Sprintf("File %s downloaded successfully", targetPath))
 	logAuditEvent(AuditEvent{Action: "download_file_from_dashboard", StepID: requestId, Command: targetPath, Success: true})
+}
+func copyFile(src, dst string, mode os.FileMode) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
 }

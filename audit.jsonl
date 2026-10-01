@@ -162,3 +162,506 @@
 {"timestamp":"2026-09-14T05:41:22Z","action":"execute_self_update","pipeline_id":"pipe-3","step_id":"step-3","success":false,"error":"SECURITY ALERT: This agent is in strict production mode and requires a cryptographically signed update. No signature was provided. Update aborted."}
 {"timestamp":"2026-09-14T05:41:22Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
 {"timestamp":"2026-09-14T05:41:22Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"Failed to download update: bad status: 404 Not Found"}
+{"timestamp":"2026-09-15T03:23:59Z","action":"start-service","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:23:59Z","action":"stop-service","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:23:59Z","action":"kill-process","command":"1234","success":true}
+{"timestamp":"2026-09-15T03:23:59Z","action":"sync-cron-jobs","success":true}
+{"timestamp":"2026-09-15T03:23:59Z","action":"execute_self_update","pipeline_id":"1","step_id":"1","success":false,"error":"Failed to download update: Get \"http://test\": dial tcp4: lookup test on 127.0.0.53:53: server misbehaving"}
+{"timestamp":"2026-09-15T03:23:59Z","action":"execute_raw_command","step_id":"req1","command":"ls","success":true}
+{"timestamp":"2026-09-15T03:23:59Z","action":"download_file_from_dashboard","step_id":"req3","command":"/tmp/b","success":false,"error":"\u003c!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"\u003e\n\u003chtml\u003e\u003chead\u003e\n\u003ctitle\u003e404 Not Found\u003c/title\u003e\n\u003c/head\u003e\u003cbody\u003e\n\u003ch1\u003eNot Found\u003c/h1\u003e\n\u003cp\u003eThe requested URL was not found on this server.\u003c/p\u003e\n\u003chr\u003e\n\u003caddress\u003eApache/2.4.66 (Ubuntu) Server at localhost Port 80\u003c/address\u003e\n\u003c/body\u003e\u003c/html\u003e\n"}
+{"timestamp":"2026-09-15T03:23:59Z","action":"execute_command","pipeline_id":"pipe-e2e","step_id":"step-e2e","command":"echo E2E_Test_Success","success":true}
+{"timestamp":"2026-09-15T03:23:59Z","action":"execute_raw_command","step_id":"req-1","command":"echo hello world","success":true}
+{"timestamp":"2026-09-15T03:23:59Z","action":"execute_raw_command","step_id":"req-timeout","command":"sleep 2","success":false,"error":"signal: killed"}
+{"timestamp":"2026-09-15T03:24:00Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-15T03:24:00Z","action":"file_write-file","pipeline_id":"pipe-1","step_id":"step-1","command":"/tmp/rasnuos_file_test1617685709/test.txt","success":true}
+{"timestamp":"2026-09-15T03:24:00Z","action":"file_read-file","pipeline_id":"pipe-1","step_id":"step-2","command":"/tmp/rasnuos_file_test1617685709/test.txt","success":true}
+{"timestamp":"2026-09-15T03:24:00Z","action":"file_list-directory","pipeline_id":"pipe-1","step_id":"step-3","command":"/tmp/rasnuos_file_test1617685709","success":true}
+{"timestamp":"2026-09-15T03:24:00Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1617685709/does-not-exist.txt","success":false,"error":"File not found or inaccessible: stat /tmp/rasnuos_file_test1617685709/does-not-exist.txt: no such file or directory"}
+{"timestamp":"2026-09-15T03:24:00Z","action":"file_write-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1617685709/bad.txt","success":false,"error":"Failed to decode base64 content: illegal base64 data at input byte 4"}
+{"timestamp":"2026-09-15T03:24:00Z","action":"file_delete-file","pipeline_id":"pipe-1","step_id":"step-4","command":"/tmp/rasnuos_file_test1617685709/test.txt","success":true}
+{"timestamp":"2026-09-15T03:24:00Z","action":"file_unknown-action","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1617685709/unknown.txt","success":false,"error":"Unknown file action"}
+{"timestamp":"2026-09-15T03:24:00Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1617685709","success":false,"error":"Cannot read non-regular files (devices, pipes, sockets)"}
+{"timestamp":"2026-09-15T03:24:00Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1617685709/large.txt","success":false,"error":"File is too large for WebSocket transfer (\u003e5MB). Use secure download instead."}
+{"timestamp":"2026-09-15T03:24:00Z","action":"file_download-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1617685709/dl.txt","success":false,"error":"URL is required for download"}
+{"timestamp":"2026-09-15T03:24:00Z","action":"file_upload-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1617685709/large.txt","success":false,"error":"URL is required for upload"}
+{"timestamp":"2026-09-15T03:24:00Z","action":"upload_file_to_dashboard","step_id":"pipe","command":"/tmp/test_upload2461411309/source.txt","success":true}
+{"timestamp":"2026-09-15T03:24:00Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download1524620783/target1.txt","success":true}
+{"timestamp":"2026-09-15T03:24:00Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download1524620783/target2.txt","success":false,"error":"SHA256 hash mismatch"}
+{"timestamp":"2026-09-15T03:24:00Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_disk_full2891536784/readonly/should_fail.txt","success":false,"error":"open /tmp/test_disk_full2891536784/readonly/should_fail.txt: permission denied"}
+{"timestamp":"2026-09-15T03:24:24Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:24Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:24Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:24Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:24Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:24Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:24Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:24Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:24Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:24Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:25Z","action":"restart-service","pipeline_id":"456","step_id":"123","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:24:25Z","action":"kill-process","pipeline_id":"456","step_id":"123","command":"9999","success":true}
+{"timestamp":"2026-09-15T03:24:25Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-15T03:24:25Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-15T03:24:25Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"SECURITY ALERT: Signature verification failed. The update payload may have been tampered with."}
+{"timestamp":"2026-09-15T03:24:25Z","action":"execute_self_update","pipeline_id":"pipe-3","step_id":"step-3","success":false,"error":"SECURITY ALERT: This agent is in strict production mode and requires a cryptographically signed update. No signature was provided. Update aborted."}
+{"timestamp":"2026-09-15T03:24:25Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-15T03:24:25Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"Failed to download update: bad status: 404 Not Found"}
+{"timestamp":"2026-09-15T03:24:35Z","action":"start-service","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:24:35Z","action":"stop-service","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:24:35Z","action":"kill-process","command":"1234","success":true}
+{"timestamp":"2026-09-15T03:24:35Z","action":"sync-cron-jobs","success":true}
+{"timestamp":"2026-09-15T03:24:35Z","action":"execute_self_update","pipeline_id":"1","step_id":"1","success":false,"error":"Failed to download update: Get \"http://test\": dial tcp4: lookup test on 127.0.0.53:53: server misbehaving"}
+{"timestamp":"2026-09-15T03:24:35Z","action":"download_file_from_dashboard","step_id":"req3","command":"/tmp/b","success":false,"error":"\u003c!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"\u003e\n\u003chtml\u003e\u003chead\u003e\n\u003ctitle\u003e404 Not Found\u003c/title\u003e\n\u003c/head\u003e\u003cbody\u003e\n\u003ch1\u003eNot Found\u003c/h1\u003e\n\u003cp\u003eThe requested URL was not found on this server.\u003c/p\u003e\n\u003chr\u003e\n\u003caddress\u003eApache/2.4.66 (Ubuntu) Server at localhost Port 80\u003c/address\u003e\n\u003c/body\u003e\u003c/html\u003e\n"}
+{"timestamp":"2026-09-15T03:24:35Z","action":"execute_raw_command","step_id":"req1","command":"ls","success":true}
+{"timestamp":"2026-09-15T03:24:35Z","action":"execute_command","pipeline_id":"pipe-e2e","step_id":"step-e2e","command":"echo E2E_Test_Success","success":true}
+{"timestamp":"2026-09-15T03:24:35Z","action":"execute_raw_command","step_id":"req-1","command":"echo hello world","success":true}
+{"timestamp":"2026-09-15T03:24:35Z","action":"execute_raw_command","step_id":"req-timeout","command":"sleep 2","success":false,"error":"signal: killed"}
+{"timestamp":"2026-09-15T03:24:35Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-15T03:24:35Z","action":"file_write-file","pipeline_id":"pipe-1","step_id":"step-1","command":"/tmp/rasnuos_file_test2023603694/test.txt","success":true}
+{"timestamp":"2026-09-15T03:24:35Z","action":"file_read-file","pipeline_id":"pipe-1","step_id":"step-2","command":"/tmp/rasnuos_file_test2023603694/test.txt","success":true}
+{"timestamp":"2026-09-15T03:24:35Z","action":"file_list-directory","pipeline_id":"pipe-1","step_id":"step-3","command":"/tmp/rasnuos_file_test2023603694","success":true}
+{"timestamp":"2026-09-15T03:24:35Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2023603694/does-not-exist.txt","success":false,"error":"File not found or inaccessible: stat /tmp/rasnuos_file_test2023603694/does-not-exist.txt: no such file or directory"}
+{"timestamp":"2026-09-15T03:24:35Z","action":"file_write-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2023603694/bad.txt","success":false,"error":"Failed to decode base64 content: illegal base64 data at input byte 4"}
+{"timestamp":"2026-09-15T03:24:35Z","action":"file_delete-file","pipeline_id":"pipe-1","step_id":"step-4","command":"/tmp/rasnuos_file_test2023603694/test.txt","success":true}
+{"timestamp":"2026-09-15T03:24:35Z","action":"file_unknown-action","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2023603694/unknown.txt","success":false,"error":"Unknown file action"}
+{"timestamp":"2026-09-15T03:24:35Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2023603694","success":false,"error":"Cannot read non-regular files (devices, pipes, sockets)"}
+{"timestamp":"2026-09-15T03:24:35Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2023603694/large.txt","success":false,"error":"File is too large for WebSocket transfer (\u003e5MB). Use secure download instead."}
+{"timestamp":"2026-09-15T03:24:35Z","action":"file_download-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2023603694/dl.txt","success":false,"error":"URL is required for download"}
+{"timestamp":"2026-09-15T03:24:35Z","action":"file_upload-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2023603694/large.txt","success":false,"error":"URL is required for upload"}
+{"timestamp":"2026-09-15T03:24:35Z","action":"upload_file_to_dashboard","step_id":"pipe","command":"/tmp/test_upload2057126687/source.txt","success":true}
+{"timestamp":"2026-09-15T03:24:35Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download1613458029/target1.txt","success":true}
+{"timestamp":"2026-09-15T03:24:35Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download1613458029/target2.txt","success":false,"error":"SHA256 hash mismatch"}
+{"timestamp":"2026-09-15T03:24:35Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_disk_full3430762538/readonly/should_fail.txt","success":false,"error":"open /tmp/test_disk_full3430762538/readonly/should_fail.txt: permission denied"}
+{"timestamp":"2026-09-15T03:24:56Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:56Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:56Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:56Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:56Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:56Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:56Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:56Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:56Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:56Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:56Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:24:57Z","action":"restart-service","pipeline_id":"456","step_id":"123","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:24:57Z","action":"kill-process","pipeline_id":"456","step_id":"123","command":"9999","success":true}
+{"timestamp":"2026-09-15T03:24:57Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-15T03:24:57Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-15T03:24:57Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"SECURITY ALERT: Signature verification failed. The update payload may have been tampered with."}
+{"timestamp":"2026-09-15T03:24:57Z","action":"execute_self_update","pipeline_id":"pipe-3","step_id":"step-3","success":false,"error":"SECURITY ALERT: This agent is in strict production mode and requires a cryptographically signed update. No signature was provided. Update aborted."}
+{"timestamp":"2026-09-15T03:24:57Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-15T03:24:57Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"Failed to download update: bad status: 404 Not Found"}
+{"timestamp":"2026-09-15T03:26:20Z","action":"start-service","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:26:20Z","action":"stop-service","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:26:20Z","action":"kill-process","command":"1234","success":true}
+{"timestamp":"2026-09-15T03:26:20Z","action":"sync-cron-jobs","success":true}
+{"timestamp":"2026-09-15T03:26:20Z","action":"execute_self_update","pipeline_id":"1","step_id":"1","success":false,"error":"Failed to download update: Get \"http://test\": dial tcp4: lookup test on 127.0.0.53:53: server misbehaving"}
+{"timestamp":"2026-09-15T03:26:20Z","action":"download_file_from_dashboard","step_id":"req3","command":"/tmp/b","success":false,"error":"\u003c!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"\u003e\n\u003chtml\u003e\u003chead\u003e\n\u003ctitle\u003e404 Not Found\u003c/title\u003e\n\u003c/head\u003e\u003cbody\u003e\n\u003ch1\u003eNot Found\u003c/h1\u003e\n\u003cp\u003eThe requested URL was not found on this server.\u003c/p\u003e\n\u003chr\u003e\n\u003caddress\u003eApache/2.4.66 (Ubuntu) Server at localhost Port 80\u003c/address\u003e\n\u003c/body\u003e\u003c/html\u003e\n"}
+{"timestamp":"2026-09-15T03:26:20Z","action":"execute_raw_command","step_id":"req1","command":"ls","success":true}
+{"timestamp":"2026-09-15T03:26:20Z","action":"execute_command","pipeline_id":"pipe-e2e","step_id":"step-e2e","command":"echo E2E_Test_Success","success":true}
+{"timestamp":"2026-09-15T03:26:21Z","action":"execute_raw_command","step_id":"req-1","command":"echo hello world","success":true}
+{"timestamp":"2026-09-15T03:26:21Z","action":"execute_raw_command","step_id":"req-timeout","command":"sleep 2","success":false,"error":"signal: killed"}
+{"timestamp":"2026-09-15T03:26:21Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-15T03:26:21Z","action":"file_write-file","pipeline_id":"pipe-1","step_id":"step-1","command":"/tmp/rasnuos_file_test1378799124/test.txt","success":true}
+{"timestamp":"2026-09-15T03:26:21Z","action":"file_read-file","pipeline_id":"pipe-1","step_id":"step-2","command":"/tmp/rasnuos_file_test1378799124/test.txt","success":true}
+{"timestamp":"2026-09-15T03:26:21Z","action":"file_list-directory","pipeline_id":"pipe-1","step_id":"step-3","command":"/tmp/rasnuos_file_test1378799124","success":true}
+{"timestamp":"2026-09-15T03:26:21Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1378799124/does-not-exist.txt","success":false,"error":"File not found or inaccessible: stat /tmp/rasnuos_file_test1378799124/does-not-exist.txt: no such file or directory"}
+{"timestamp":"2026-09-15T03:26:21Z","action":"file_write-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1378799124/bad.txt","success":false,"error":"Failed to decode base64 content: illegal base64 data at input byte 4"}
+{"timestamp":"2026-09-15T03:26:21Z","action":"file_delete-file","pipeline_id":"pipe-1","step_id":"step-4","command":"/tmp/rasnuos_file_test1378799124/test.txt","success":true}
+{"timestamp":"2026-09-15T03:26:21Z","action":"file_unknown-action","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1378799124/unknown.txt","success":false,"error":"Unknown file action"}
+{"timestamp":"2026-09-15T03:26:21Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1378799124","success":false,"error":"Cannot read non-regular files (devices, pipes, sockets)"}
+{"timestamp":"2026-09-15T03:26:21Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1378799124/large.txt","success":false,"error":"File is too large for WebSocket transfer (\u003e5MB). Use secure download instead."}
+{"timestamp":"2026-09-15T03:26:21Z","action":"file_download-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1378799124/dl.txt","success":false,"error":"URL is required for download"}
+{"timestamp":"2026-09-15T03:26:21Z","action":"file_upload-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1378799124/large.txt","success":false,"error":"URL is required for upload"}
+{"timestamp":"2026-09-15T03:26:21Z","action":"upload_file_to_dashboard","step_id":"pipe","command":"/tmp/test_upload948331380/source.txt","success":true}
+{"timestamp":"2026-09-15T03:26:21Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download338128343/target1.txt","success":true}
+{"timestamp":"2026-09-15T03:26:21Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download338128343/target2.txt","success":false,"error":"SHA256 hash mismatch"}
+{"timestamp":"2026-09-15T03:26:21Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_disk_full2263276047/readonly/should_fail.txt","success":false,"error":"open /tmp/test_disk_full2263276047/readonly/should_fail.txt: permission denied"}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"restart-service","pipeline_id":"456","step_id":"123","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"kill-process","pipeline_id":"456","step_id":"123","command":"9999","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"SECURITY ALERT: Signature verification failed. The update payload may have been tampered with."}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_self_update","pipeline_id":"pipe-3","step_id":"step-3","success":false,"error":"SECURITY ALERT: This agent is in strict production mode and requires a cryptographically signed update. No signature was provided. Update aborted."}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-15T03:26:42Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"Failed to download update: bad status: 404 Not Found"}
+{"timestamp":"2026-09-15T03:27:15Z","action":"start-service","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:27:15Z","action":"stop-service","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:27:15Z","action":"kill-process","command":"1234","success":true}
+{"timestamp":"2026-09-15T03:27:15Z","action":"sync-cron-jobs","success":true}
+{"timestamp":"2026-09-15T03:27:15Z","action":"execute_self_update","pipeline_id":"1","step_id":"1","success":false,"error":"Failed to download update: Get \"http://test\": dial tcp4: lookup test on 127.0.0.53:53: server misbehaving"}
+{"timestamp":"2026-09-15T03:27:15Z","action":"download_file_from_dashboard","step_id":"req3","command":"/tmp/b","success":false,"error":"\u003c!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"\u003e\n\u003chtml\u003e\u003chead\u003e\n\u003ctitle\u003e404 Not Found\u003c/title\u003e\n\u003c/head\u003e\u003cbody\u003e\n\u003ch1\u003eNot Found\u003c/h1\u003e\n\u003cp\u003eThe requested URL was not found on this server.\u003c/p\u003e\n\u003chr\u003e\n\u003caddress\u003eApache/2.4.66 (Ubuntu) Server at localhost Port 80\u003c/address\u003e\n\u003c/body\u003e\u003c/html\u003e\n"}
+{"timestamp":"2026-09-15T03:27:15Z","action":"execute_raw_command","step_id":"req1","command":"ls","success":true}
+{"timestamp":"2026-09-15T03:27:15Z","action":"execute_command","pipeline_id":"pipe-e2e","step_id":"step-e2e","command":"echo E2E_Test_Success","success":true}
+{"timestamp":"2026-09-15T03:27:15Z","action":"execute_raw_command","step_id":"req-1","command":"echo hello world","success":true}
+{"timestamp":"2026-09-15T03:27:15Z","action":"execute_raw_command","step_id":"req-timeout","command":"sleep 2","success":false,"error":"signal: killed"}
+{"timestamp":"2026-09-15T03:27:15Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-15T03:27:15Z","action":"file_write-file","pipeline_id":"pipe-1","step_id":"step-1","command":"/tmp/rasnuos_file_test3094777383/test.txt","success":true}
+{"timestamp":"2026-09-15T03:27:15Z","action":"file_read-file","pipeline_id":"pipe-1","step_id":"step-2","command":"/tmp/rasnuos_file_test3094777383/test.txt","success":true}
+{"timestamp":"2026-09-15T03:27:15Z","action":"file_list-directory","pipeline_id":"pipe-1","step_id":"step-3","command":"/tmp/rasnuos_file_test3094777383","success":true}
+{"timestamp":"2026-09-15T03:27:15Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3094777383/does-not-exist.txt","success":false,"error":"File not found or inaccessible: stat /tmp/rasnuos_file_test3094777383/does-not-exist.txt: no such file or directory"}
+{"timestamp":"2026-09-15T03:27:15Z","action":"file_write-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3094777383/bad.txt","success":false,"error":"Failed to decode base64 content: illegal base64 data at input byte 4"}
+{"timestamp":"2026-09-15T03:27:15Z","action":"file_delete-file","pipeline_id":"pipe-1","step_id":"step-4","command":"/tmp/rasnuos_file_test3094777383/test.txt","success":true}
+{"timestamp":"2026-09-15T03:27:15Z","action":"file_unknown-action","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3094777383/unknown.txt","success":false,"error":"Unknown file action"}
+{"timestamp":"2026-09-15T03:27:15Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3094777383","success":false,"error":"Cannot read non-regular files (devices, pipes, sockets)"}
+{"timestamp":"2026-09-15T03:27:15Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3094777383/large.txt","success":false,"error":"File is too large for WebSocket transfer (\u003e5MB). Use secure download instead."}
+{"timestamp":"2026-09-15T03:27:15Z","action":"file_download-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3094777383/dl.txt","success":false,"error":"URL is required for download"}
+{"timestamp":"2026-09-15T03:27:15Z","action":"file_upload-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3094777383/large.txt","success":false,"error":"URL is required for upload"}
+{"timestamp":"2026-09-15T03:27:15Z","action":"upload_file_to_dashboard","step_id":"pipe","command":"/tmp/test_upload3535139972/source.txt","success":true}
+{"timestamp":"2026-09-15T03:27:15Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download3535589211/target1.txt","success":true}
+{"timestamp":"2026-09-15T03:27:15Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download3535589211/target2.txt","success":false,"error":"SHA256 hash mismatch"}
+{"timestamp":"2026-09-15T03:27:15Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_disk_full3599871607/readonly/should_fail.txt","success":false,"error":"open /tmp/test_disk_full3599871607/readonly/should_fail.txt: permission denied"}
+{"timestamp":"2026-09-15T03:27:36Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:27:36Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:27:36Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:27:36Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:27:36Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:27:36Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:27:36Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:27:36Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:27:36Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:27:36Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:27:36Z","action":"restart-service","pipeline_id":"456","step_id":"123","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:27:36Z","action":"kill-process","pipeline_id":"456","step_id":"123","command":"9999","success":true}
+{"timestamp":"2026-09-15T03:27:37Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-15T03:27:37Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-15T03:27:37Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"SECURITY ALERT: Signature verification failed. The update payload may have been tampered with."}
+{"timestamp":"2026-09-15T03:27:37Z","action":"execute_self_update","pipeline_id":"pipe-3","step_id":"step-3","success":false,"error":"SECURITY ALERT: This agent is in strict production mode and requires a cryptographically signed update. No signature was provided. Update aborted."}
+{"timestamp":"2026-09-15T03:27:37Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-15T03:27:37Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"Failed to download update: bad status: 404 Not Found"}
+{"timestamp":"2026-09-15T03:29:12Z","action":"start-service","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:29:12Z","action":"stop-service","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:29:12Z","action":"kill-process","command":"1234","success":true}
+{"timestamp":"2026-09-15T03:29:12Z","action":"sync-cron-jobs","success":true}
+{"timestamp":"2026-09-15T03:29:12Z","action":"execute_self_update","pipeline_id":"1","step_id":"1","success":false,"error":"Failed to download update: Get \"http://test\": dial tcp4: lookup test on 127.0.0.53:53: server misbehaving"}
+{"timestamp":"2026-09-15T03:29:12Z","action":"download_file_from_dashboard","step_id":"req3","command":"/tmp/b","success":false,"error":"\u003c!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"\u003e\n\u003chtml\u003e\u003chead\u003e\n\u003ctitle\u003e404 Not Found\u003c/title\u003e\n\u003c/head\u003e\u003cbody\u003e\n\u003ch1\u003eNot Found\u003c/h1\u003e\n\u003cp\u003eThe requested URL was not found on this server.\u003c/p\u003e\n\u003chr\u003e\n\u003caddress\u003eApache/2.4.66 (Ubuntu) Server at localhost Port 80\u003c/address\u003e\n\u003c/body\u003e\u003c/html\u003e\n"}
+{"timestamp":"2026-09-15T03:29:12Z","action":"execute_raw_command","step_id":"req1","command":"ls","success":true}
+{"timestamp":"2026-09-15T03:29:12Z","action":"execute_command","pipeline_id":"pipe-e2e","step_id":"step-e2e","command":"echo E2E_Test_Success","success":true}
+{"timestamp":"2026-09-15T03:29:12Z","action":"execute_raw_command","step_id":"req-1","command":"echo hello world","success":true}
+{"timestamp":"2026-09-15T03:29:12Z","action":"execute_raw_command","step_id":"req-timeout","command":"sleep 2","success":false,"error":"signal: killed"}
+{"timestamp":"2026-09-15T03:29:12Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-15T03:29:12Z","action":"file_write-file","pipeline_id":"pipe-1","step_id":"step-1","command":"/tmp/rasnuos_file_test2576691880/test.txt","success":true}
+{"timestamp":"2026-09-15T03:29:12Z","action":"file_read-file","pipeline_id":"pipe-1","step_id":"step-2","command":"/tmp/rasnuos_file_test2576691880/test.txt","success":true}
+{"timestamp":"2026-09-15T03:29:12Z","action":"file_list-directory","pipeline_id":"pipe-1","step_id":"step-3","command":"/tmp/rasnuos_file_test2576691880","success":true}
+{"timestamp":"2026-09-15T03:29:12Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2576691880/does-not-exist.txt","success":false,"error":"File not found or inaccessible: stat /tmp/rasnuos_file_test2576691880/does-not-exist.txt: no such file or directory"}
+{"timestamp":"2026-09-15T03:29:12Z","action":"file_write-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2576691880/bad.txt","success":false,"error":"Failed to decode base64 content: illegal base64 data at input byte 4"}
+{"timestamp":"2026-09-15T03:29:12Z","action":"file_delete-file","pipeline_id":"pipe-1","step_id":"step-4","command":"/tmp/rasnuos_file_test2576691880/test.txt","success":true}
+{"timestamp":"2026-09-15T03:29:12Z","action":"file_unknown-action","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2576691880/unknown.txt","success":false,"error":"Unknown file action"}
+{"timestamp":"2026-09-15T03:29:12Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2576691880","success":false,"error":"Cannot read non-regular files (devices, pipes, sockets)"}
+{"timestamp":"2026-09-15T03:29:12Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2576691880/large.txt","success":false,"error":"File is too large for WebSocket transfer (\u003e5MB). Use secure download instead."}
+{"timestamp":"2026-09-15T03:29:12Z","action":"file_download-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2576691880/dl.txt","success":false,"error":"URL is required for download"}
+{"timestamp":"2026-09-15T03:29:12Z","action":"file_upload-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2576691880/large.txt","success":false,"error":"URL is required for upload"}
+{"timestamp":"2026-09-15T03:29:12Z","action":"upload_file_to_dashboard","step_id":"pipe","command":"/tmp/test_upload1006692260/source.txt","success":true}
+{"timestamp":"2026-09-15T03:29:12Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download3244263082/target1.txt","success":true}
+{"timestamp":"2026-09-15T03:29:12Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download3244263082/target2.txt","success":false,"error":"SHA256 hash mismatch"}
+{"timestamp":"2026-09-15T03:29:12Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_disk_full2438078156/readonly/should_fail.txt","success":false,"error":"open /tmp/test_disk_full2438078156/readonly/should_fail.txt: permission denied"}
+{"timestamp":"2026-09-15T03:29:33Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:29:33Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:29:33Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:29:33Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:29:33Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:29:33Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:29:33Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:29:33Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:29:33Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:29:33Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-15T03:29:33Z","action":"restart-service","pipeline_id":"456","step_id":"123","command":"nginx","success":true}
+{"timestamp":"2026-09-15T03:29:33Z","action":"kill-process","pipeline_id":"456","step_id":"123","command":"9999","success":true}
+{"timestamp":"2026-09-15T03:29:34Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-15T03:29:34Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-15T03:29:34Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"SECURITY ALERT: Signature verification failed. The update payload may have been tampered with."}
+{"timestamp":"2026-09-15T03:29:34Z","action":"execute_self_update","pipeline_id":"pipe-3","step_id":"step-3","success":false,"error":"SECURITY ALERT: This agent is in strict production mode and requires a cryptographically signed update. No signature was provided. Update aborted."}
+{"timestamp":"2026-09-15T03:29:34Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-15T03:29:34Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"Failed to download update: bad status: 404 Not Found"}
+{"timestamp":"2026-09-20T23:18:55Z","action":"start-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:18:55Z","action":"stop-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:18:55Z","action":"kill-process","command":"1234","success":true}
+{"timestamp":"2026-09-20T23:18:55Z","action":"sync-cron-jobs","success":true}
+{"timestamp":"2026-09-20T23:18:55Z","action":"execute_self_update","pipeline_id":"1","step_id":"1","success":false,"error":"Failed to download update: Get \"http://test\": dial tcp4: lookup test on 127.0.0.53:53: server misbehaving"}
+{"timestamp":"2026-09-20T23:18:55Z","action":"execute_raw_command","step_id":"req1","command":"ls","success":true}
+{"timestamp":"2026-09-20T23:18:55Z","action":"download_file_from_dashboard","step_id":"req3","command":"/tmp/b","success":false,"error":"\u003c!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"\u003e\n\u003chtml\u003e\u003chead\u003e\n\u003ctitle\u003e404 Not Found\u003c/title\u003e\n\u003c/head\u003e\u003cbody\u003e\n\u003ch1\u003eNot Found\u003c/h1\u003e\n\u003cp\u003eThe requested URL was not found on this server.\u003c/p\u003e\n\u003chr\u003e\n\u003caddress\u003eApache/2.4.66 (Ubuntu) Server at localhost Port 80\u003c/address\u003e\n\u003c/body\u003e\u003c/html\u003e\n"}
+{"timestamp":"2026-09-20T23:18:55Z","action":"execute_command","pipeline_id":"pipe-e2e","step_id":"step-e2e","command":"echo E2E_Test_Success","success":true}
+{"timestamp":"2026-09-20T23:18:56Z","action":"execute_raw_command","step_id":"req-1","command":"echo hello world","success":true}
+{"timestamp":"2026-09-20T23:18:56Z","action":"execute_raw_command","step_id":"req-timeout","command":"sleep 2","success":false,"error":"signal: killed"}
+{"timestamp":"2026-09-20T23:18:56Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-20T23:18:56Z","action":"file_write-file","pipeline_id":"pipe-1","step_id":"step-1","command":"/tmp/rasnuos_file_test3504766887/test.txt","success":true}
+{"timestamp":"2026-09-20T23:18:56Z","action":"file_read-file","pipeline_id":"pipe-1","step_id":"step-2","command":"/tmp/rasnuos_file_test3504766887/test.txt","success":true}
+{"timestamp":"2026-09-20T23:18:56Z","action":"file_list-directory","pipeline_id":"pipe-1","step_id":"step-3","command":"/tmp/rasnuos_file_test3504766887","success":true}
+{"timestamp":"2026-09-20T23:18:56Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3504766887/does-not-exist.txt","success":false,"error":"File not found or inaccessible: stat /tmp/rasnuos_file_test3504766887/does-not-exist.txt: no such file or directory"}
+{"timestamp":"2026-09-20T23:18:56Z","action":"file_write-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3504766887/bad.txt","success":false,"error":"Failed to decode base64 content: illegal base64 data at input byte 4"}
+{"timestamp":"2026-09-20T23:18:56Z","action":"file_delete-file","pipeline_id":"pipe-1","step_id":"step-4","command":"/tmp/rasnuos_file_test3504766887/test.txt","success":true}
+{"timestamp":"2026-09-20T23:18:56Z","action":"file_unknown-action","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3504766887/unknown.txt","success":false,"error":"Unknown file action"}
+{"timestamp":"2026-09-20T23:18:56Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3504766887","success":false,"error":"Cannot read non-regular files (devices, pipes, sockets)"}
+{"timestamp":"2026-09-20T23:18:56Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3504766887/large.txt","success":false,"error":"File is too large for WebSocket transfer (\u003e5MB). Use secure download instead."}
+{"timestamp":"2026-09-20T23:18:56Z","action":"file_download-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3504766887/dl.txt","success":false,"error":"URL is required for download"}
+{"timestamp":"2026-09-20T23:18:56Z","action":"file_upload-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3504766887/large.txt","success":false,"error":"URL is required for upload"}
+{"timestamp":"2026-09-20T23:18:56Z","action":"upload_file_to_dashboard","step_id":"pipe","command":"/tmp/test_upload3628033306/source.txt","success":true}
+{"timestamp":"2026-09-20T23:18:56Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download3965964001/target1.txt","success":true}
+{"timestamp":"2026-09-20T23:18:56Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download3965964001/target2.txt","success":false,"error":"SHA256 hash mismatch"}
+{"timestamp":"2026-09-20T23:18:56Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_disk_full2728670241/readonly/should_fail.txt","success":false,"error":"open /tmp/test_disk_full2728670241/readonly/should_fail.txt: permission denied"}
+{"timestamp":"2026-09-20T23:19:19Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:19:19Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:19:19Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:19:19Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:19:19Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:19:19Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:19:19Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:19:19Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:19:19Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:19:19Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:19:19Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:19:19Z","action":"restart-service","pipeline_id":"456","step_id":"123","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:19:19Z","action":"kill-process","pipeline_id":"456","step_id":"123","command":"9999","success":true}
+{"timestamp":"2026-09-20T23:19:19Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-20T23:19:19Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-20T23:19:25Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"SECURITY ALERT: Signature verification failed. The update payload may have been tampered with."}
+{"timestamp":"2026-09-20T23:19:31Z","action":"execute_self_update","pipeline_id":"pipe-3","step_id":"step-3","success":false,"error":"SECURITY ALERT: This agent is in strict production mode and requires a cryptographically signed update. No signature was provided. Update aborted."}
+{"timestamp":"2026-09-20T23:19:38Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-20T23:19:44Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"Failed to download update: bad status: 404 Not Found"}
+{"timestamp":"2026-09-20T23:19:49Z","action":"execute_self_update","pipeline_id":"456","step_id":"123","success":false,"error":"Failed to download update: Get \"http://fake-url.com/update\": dial tcp4 192.99.11.219:80: i/o timeout"}
+{"timestamp":"2026-09-20T23:20:11Z","action":"start-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"stop-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"kill-process","command":"1234","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"sync-cron-jobs","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"execute_self_update","pipeline_id":"1","step_id":"1","success":false,"error":"Failed to download update: Get \"http://test\": dial tcp4: lookup test on 127.0.0.53:53: server misbehaving"}
+{"timestamp":"2026-09-20T23:20:11Z","action":"download_file_from_dashboard","step_id":"req3","command":"/tmp/b","success":false,"error":"\u003c!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"\u003e\n\u003chtml\u003e\u003chead\u003e\n\u003ctitle\u003e404 Not Found\u003c/title\u003e\n\u003c/head\u003e\u003cbody\u003e\n\u003ch1\u003eNot Found\u003c/h1\u003e\n\u003cp\u003eThe requested URL was not found on this server.\u003c/p\u003e\n\u003chr\u003e\n\u003caddress\u003eApache/2.4.66 (Ubuntu) Server at localhost Port 80\u003c/address\u003e\n\u003c/body\u003e\u003c/html\u003e\n"}
+{"timestamp":"2026-09-20T23:20:11Z","action":"execute_raw_command","step_id":"req1","command":"ls","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"restart-service","pipeline_id":"456","step_id":"123","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"kill-process","pipeline_id":"456","step_id":"123","command":"9999","success":true}
+{"timestamp":"2026-09-20T23:20:11Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-20T23:21:04Z","action":"start-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:21:04Z","action":"stop-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:21:04Z","action":"kill-process","command":"1234","success":true}
+{"timestamp":"2026-09-20T23:21:04Z","action":"sync-cron-jobs","success":true}
+{"timestamp":"2026-09-20T23:21:04Z","action":"execute_self_update","pipeline_id":"1","step_id":"1","success":false,"error":"Failed to download update: Get \"http://test\": dial tcp4: lookup test on 127.0.0.53:53: server misbehaving"}
+{"timestamp":"2026-09-20T23:21:04Z","action":"download_file_from_dashboard","step_id":"req3","command":"/tmp/b","success":false,"error":"\u003c!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"\u003e\n\u003chtml\u003e\u003chead\u003e\n\u003ctitle\u003e404 Not Found\u003c/title\u003e\n\u003c/head\u003e\u003cbody\u003e\n\u003ch1\u003eNot Found\u003c/h1\u003e\n\u003cp\u003eThe requested URL was not found on this server.\u003c/p\u003e\n\u003chr\u003e\n\u003caddress\u003eApache/2.4.66 (Ubuntu) Server at localhost Port 80\u003c/address\u003e\n\u003c/body\u003e\u003c/html\u003e\n"}
+{"timestamp":"2026-09-20T23:21:04Z","action":"execute_raw_command","step_id":"req1","command":"ls","success":true}
+{"timestamp":"2026-09-20T23:21:04Z","action":"execute_command","pipeline_id":"pipe-e2e","step_id":"step-e2e","command":"echo E2E_Test_Success","success":true}
+{"timestamp":"2026-09-20T23:21:05Z","action":"execute_raw_command","step_id":"req-1","command":"echo hello world","success":true}
+{"timestamp":"2026-09-20T23:21:05Z","action":"execute_raw_command","step_id":"req-timeout","command":"sleep 2","success":false,"error":"signal: killed"}
+{"timestamp":"2026-09-20T23:21:05Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-20T23:21:05Z","action":"file_write-file","pipeline_id":"pipe-1","step_id":"step-1","command":"/tmp/rasnuos_file_test2855158452/test.txt","success":true}
+{"timestamp":"2026-09-20T23:21:05Z","action":"file_read-file","pipeline_id":"pipe-1","step_id":"step-2","command":"/tmp/rasnuos_file_test2855158452/test.txt","success":true}
+{"timestamp":"2026-09-20T23:21:05Z","action":"file_list-directory","pipeline_id":"pipe-1","step_id":"step-3","command":"/tmp/rasnuos_file_test2855158452","success":true}
+{"timestamp":"2026-09-20T23:21:05Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2855158452/does-not-exist.txt","success":false,"error":"File not found or inaccessible: stat /tmp/rasnuos_file_test2855158452/does-not-exist.txt: no such file or directory"}
+{"timestamp":"2026-09-20T23:21:05Z","action":"file_write-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2855158452/bad.txt","success":false,"error":"Failed to decode base64 content: illegal base64 data at input byte 4"}
+{"timestamp":"2026-09-20T23:21:05Z","action":"file_delete-file","pipeline_id":"pipe-1","step_id":"step-4","command":"/tmp/rasnuos_file_test2855158452/test.txt","success":true}
+{"timestamp":"2026-09-20T23:21:05Z","action":"file_unknown-action","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2855158452/unknown.txt","success":false,"error":"Unknown file action"}
+{"timestamp":"2026-09-20T23:21:05Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2855158452","success":false,"error":"Cannot read non-regular files (devices, pipes, sockets)"}
+{"timestamp":"2026-09-20T23:21:05Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2855158452/large.txt","success":false,"error":"File is too large for WebSocket transfer (\u003e5MB). Use secure download instead."}
+{"timestamp":"2026-09-20T23:21:05Z","action":"file_download-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2855158452/dl.txt","success":false,"error":"URL is required for download"}
+{"timestamp":"2026-09-20T23:21:05Z","action":"file_upload-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2855158452/large.txt","success":false,"error":"URL is required for upload"}
+{"timestamp":"2026-09-20T23:21:05Z","action":"upload_file_to_dashboard","step_id":"pipe","command":"/tmp/test_upload1248435817/source.txt","success":true}
+{"timestamp":"2026-09-20T23:21:05Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download2508378158/target1.txt","success":true}
+{"timestamp":"2026-09-20T23:21:05Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download2508378158/target2.txt","success":false,"error":"SHA256 hash mismatch"}
+{"timestamp":"2026-09-20T23:21:05Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_disk_full3322735593/readonly/should_fail.txt","success":false,"error":"open /tmp/test_disk_full3322735593/readonly/should_fail.txt: permission denied"}
+{"timestamp":"2026-09-20T23:21:22Z","action":"start-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:21:22Z","action":"stop-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:21:22Z","action":"kill-process","command":"1234","success":true}
+{"timestamp":"2026-09-20T23:21:22Z","action":"sync-cron-jobs","success":true}
+{"timestamp":"2026-09-20T23:21:22Z","action":"execute_self_update","pipeline_id":"1","step_id":"1","success":false,"error":"Failed to download update: Get \"http://test\": dial tcp4: lookup test on 127.0.0.53:53: server misbehaving"}
+{"timestamp":"2026-09-20T23:21:22Z","action":"download_file_from_dashboard","step_id":"req3","command":"/tmp/b","success":false,"error":"\u003c!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"\u003e\n\u003chtml\u003e\u003chead\u003e\n\u003ctitle\u003e404 Not Found\u003c/title\u003e\n\u003c/head\u003e\u003cbody\u003e\n\u003ch1\u003eNot Found\u003c/h1\u003e\n\u003cp\u003eThe requested URL was not found on this server.\u003c/p\u003e\n\u003chr\u003e\n\u003caddress\u003eApache/2.4.66 (Ubuntu) Server at localhost Port 80\u003c/address\u003e\n\u003c/body\u003e\u003c/html\u003e\n"}
+{"timestamp":"2026-09-20T23:21:22Z","action":"execute_raw_command","step_id":"req1","command":"ls","success":true}
+{"timestamp":"2026-09-20T23:21:22Z","action":"upload_file_to_dashboard","step_id":"pipe","command":"/tmp/test_upload2379280268/source.txt","success":true}
+{"timestamp":"2026-09-20T23:21:22Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download761010798/target1.txt","success":true}
+{"timestamp":"2026-09-20T23:21:22Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download761010798/target2.txt","success":false,"error":"SHA256 hash mismatch"}
+{"timestamp":"2026-09-20T23:21:49Z","action":"start-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:21:49Z","action":"stop-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:21:49Z","action":"kill-process","command":"1234","success":true}
+{"timestamp":"2026-09-20T23:21:49Z","action":"sync-cron-jobs","success":true}
+{"timestamp":"2026-09-20T23:21:49Z","action":"execute_self_update","pipeline_id":"1","step_id":"1","success":false,"error":"Failed to download update: Get \"http://test\": dial tcp4: lookup test on 127.0.0.53:53: server misbehaving"}
+{"timestamp":"2026-09-20T23:21:49Z","action":"download_file_from_dashboard","step_id":"req3","command":"/tmp/b","success":false,"error":"\u003c!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"\u003e\n\u003chtml\u003e\u003chead\u003e\n\u003ctitle\u003e404 Not Found\u003c/title\u003e\n\u003c/head\u003e\u003cbody\u003e\n\u003ch1\u003eNot Found\u003c/h1\u003e\n\u003cp\u003eThe requested URL was not found on this server.\u003c/p\u003e\n\u003chr\u003e\n\u003caddress\u003eApache/2.4.66 (Ubuntu) Server at localhost Port 80\u003c/address\u003e\n\u003c/body\u003e\u003c/html\u003e\n"}
+{"timestamp":"2026-09-20T23:21:49Z","action":"execute_raw_command","step_id":"req1","command":"ls","success":true}
+{"timestamp":"2026-09-20T23:21:49Z","action":"execute_command","pipeline_id":"pipe-e2e","step_id":"step-e2e","command":"echo E2E_Test_Success","success":true}
+{"timestamp":"2026-09-20T23:21:50Z","action":"execute_raw_command","step_id":"req-1","command":"echo hello world","success":true}
+{"timestamp":"2026-09-20T23:21:50Z","action":"execute_raw_command","step_id":"req-timeout","command":"sleep 2","success":false,"error":"signal: killed"}
+{"timestamp":"2026-09-20T23:21:50Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-20T23:21:50Z","action":"file_write-file","pipeline_id":"pipe-1","step_id":"step-1","command":"/tmp/rasnuos_file_test2983680973/test.txt","success":true}
+{"timestamp":"2026-09-20T23:21:50Z","action":"file_read-file","pipeline_id":"pipe-1","step_id":"step-2","command":"/tmp/rasnuos_file_test2983680973/test.txt","success":true}
+{"timestamp":"2026-09-20T23:21:50Z","action":"file_list-directory","pipeline_id":"pipe-1","step_id":"step-3","command":"/tmp/rasnuos_file_test2983680973","success":true}
+{"timestamp":"2026-09-20T23:21:50Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2983680973/does-not-exist.txt","success":false,"error":"File not found or inaccessible: stat /tmp/rasnuos_file_test2983680973/does-not-exist.txt: no such file or directory"}
+{"timestamp":"2026-09-20T23:21:50Z","action":"file_write-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2983680973/bad.txt","success":false,"error":"Failed to decode base64 content: illegal base64 data at input byte 4"}
+{"timestamp":"2026-09-20T23:21:50Z","action":"file_delete-file","pipeline_id":"pipe-1","step_id":"step-4","command":"/tmp/rasnuos_file_test2983680973/test.txt","success":true}
+{"timestamp":"2026-09-20T23:21:50Z","action":"file_unknown-action","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2983680973/unknown.txt","success":false,"error":"Unknown file action"}
+{"timestamp":"2026-09-20T23:21:50Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2983680973","success":false,"error":"Cannot read non-regular files (devices, pipes, sockets)"}
+{"timestamp":"2026-09-20T23:21:50Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2983680973/large.txt","success":false,"error":"File is too large for WebSocket transfer (\u003e5MB). Use secure download instead."}
+{"timestamp":"2026-09-20T23:21:50Z","action":"file_download-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2983680973/dl.txt","success":false,"error":"URL is required for download"}
+{"timestamp":"2026-09-20T23:21:50Z","action":"file_upload-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test2983680973/large.txt","success":false,"error":"URL is required for upload"}
+{"timestamp":"2026-09-20T23:21:50Z","action":"upload_file_to_dashboard","step_id":"pipe","command":"/tmp/test_upload1575158125/source.txt","success":true}
+{"timestamp":"2026-09-20T23:21:50Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download3906288151/target1.txt","success":true}
+{"timestamp":"2026-09-20T23:21:50Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download3906288151/target2.txt","success":false,"error":"SHA256 hash mismatch"}
+{"timestamp":"2026-09-20T23:21:50Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_disk_full3194332413/readonly/should_fail.txt","success":false,"error":"open /tmp/test_disk_full3194332413/readonly/should_fail.txt: permission denied"}
+{"timestamp":"2026-09-20T23:22:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:22:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:22:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:22:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:22:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:22:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:22:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:22:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:22:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:22:11Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:22:11Z","action":"restart-service","pipeline_id":"456","step_id":"123","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:22:11Z","action":"kill-process","pipeline_id":"456","step_id":"123","command":"9999","success":true}
+{"timestamp":"2026-09-20T23:22:11Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-20T23:22:11Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-20T23:22:18Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"SECURITY ALERT: Signature verification failed. The update payload may have been tampered with."}
+{"timestamp":"2026-09-20T23:22:24Z","action":"execute_self_update","pipeline_id":"pipe-3","step_id":"step-3","success":false,"error":"SECURITY ALERT: This agent is in strict production mode and requires a cryptographically signed update. No signature was provided. Update aborted."}
+{"timestamp":"2026-09-20T23:22:30Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-20T23:22:36Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"Failed to download update: bad status: 404 Not Found"}
+{"timestamp":"2026-09-20T23:22:41Z","action":"execute_self_update","pipeline_id":"456","step_id":"123","success":false,"error":"Failed to download update: Get \"http://fake-url.com/update\": dial tcp4 192.99.11.219:80: i/o timeout"}
+{"timestamp":"2026-09-20T23:23:58Z","action":"start-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:23:58Z","action":"stop-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:23:58Z","action":"kill-process","command":"1234","success":true}
+{"timestamp":"2026-09-20T23:23:58Z","action":"sync-cron-jobs","success":true}
+{"timestamp":"2026-09-20T23:23:58Z","action":"execute_self_update","pipeline_id":"1","step_id":"1","success":false,"error":"Failed to download update: Get \"http://test\": dial tcp4: lookup test on 127.0.0.53:53: server misbehaving"}
+{"timestamp":"2026-09-20T23:23:58Z","action":"download_file_from_dashboard","step_id":"req3","command":"/tmp/b","success":false,"error":"\u003c!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"\u003e\n\u003chtml\u003e\u003chead\u003e\n\u003ctitle\u003e404 Not Found\u003c/title\u003e\n\u003c/head\u003e\u003cbody\u003e\n\u003ch1\u003eNot Found\u003c/h1\u003e\n\u003cp\u003eThe requested URL was not found on this server.\u003c/p\u003e\n\u003chr\u003e\n\u003caddress\u003eApache/2.4.66 (Ubuntu) Server at localhost Port 80\u003c/address\u003e\n\u003c/body\u003e\u003c/html\u003e\n"}
+{"timestamp":"2026-09-20T23:23:58Z","action":"execute_raw_command","step_id":"req1","command":"ls","success":true}
+{"timestamp":"2026-09-20T23:23:58Z","action":"execute_command","pipeline_id":"pipe-e2e","step_id":"step-e2e","command":"echo E2E_Test_Success","success":true}
+{"timestamp":"2026-09-20T23:23:59Z","action":"execute_raw_command","step_id":"req-1","command":"echo hello world","success":true}
+{"timestamp":"2026-09-20T23:23:59Z","action":"execute_raw_command","step_id":"req-timeout","command":"sleep 2","success":false,"error":"signal: killed"}
+{"timestamp":"2026-09-20T23:23:59Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-20T23:23:59Z","action":"file_write-file","pipeline_id":"pipe-1","step_id":"step-1","command":"/tmp/rasnuos_file_test3753929555/test.txt","success":true}
+{"timestamp":"2026-09-20T23:23:59Z","action":"file_read-file","pipeline_id":"pipe-1","step_id":"step-2","command":"/tmp/rasnuos_file_test3753929555/test.txt","success":true}
+{"timestamp":"2026-09-20T23:23:59Z","action":"file_list-directory","pipeline_id":"pipe-1","step_id":"step-3","command":"/tmp/rasnuos_file_test3753929555","success":true}
+{"timestamp":"2026-09-20T23:23:59Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3753929555/does-not-exist.txt","success":false,"error":"File not found or inaccessible: stat /tmp/rasnuos_file_test3753929555/does-not-exist.txt: no such file or directory"}
+{"timestamp":"2026-09-20T23:23:59Z","action":"file_write-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3753929555/bad.txt","success":false,"error":"Failed to decode base64 content: illegal base64 data at input byte 4"}
+{"timestamp":"2026-09-20T23:23:59Z","action":"file_delete-file","pipeline_id":"pipe-1","step_id":"step-4","command":"/tmp/rasnuos_file_test3753929555/test.txt","success":true}
+{"timestamp":"2026-09-20T23:23:59Z","action":"file_unknown-action","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3753929555/unknown.txt","success":false,"error":"Unknown file action"}
+{"timestamp":"2026-09-20T23:23:59Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3753929555","success":false,"error":"Cannot read non-regular files (devices, pipes, sockets)"}
+{"timestamp":"2026-09-20T23:23:59Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3753929555/large.txt","success":false,"error":"File is too large for WebSocket transfer (\u003e5MB). Use secure download instead."}
+{"timestamp":"2026-09-20T23:23:59Z","action":"file_download-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3753929555/dl.txt","success":false,"error":"URL is required for download"}
+{"timestamp":"2026-09-20T23:23:59Z","action":"file_upload-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3753929555/large.txt","success":false,"error":"URL is required for upload"}
+{"timestamp":"2026-09-20T23:23:59Z","action":"upload_file_to_dashboard","step_id":"pipe","command":"/tmp/test_upload1746779957/source.txt","success":true}
+{"timestamp":"2026-09-20T23:23:59Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download3366492322/target1.txt","success":true}
+{"timestamp":"2026-09-20T23:23:59Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download3366492322/target2.txt","success":false,"error":"SHA256 hash mismatch"}
+{"timestamp":"2026-09-20T23:23:59Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_disk_full806759455/readonly/should_fail.txt","success":false,"error":"open /tmp/test_disk_full806759455/readonly/should_fail.txt: permission denied"}
+{"timestamp":"2026-09-20T23:24:20Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:24:20Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:24:20Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:24:20Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:24:20Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:24:20Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:24:20Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:24:20Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:24:20Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:24:20Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:24:21Z","action":"restart-service","pipeline_id":"456","step_id":"123","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:24:21Z","action":"kill-process","pipeline_id":"456","step_id":"123","command":"9999","success":true}
+{"timestamp":"2026-09-20T23:24:21Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-20T23:24:21Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-20T23:24:27Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"SECURITY ALERT: Signature verification failed. The update payload may have been tampered with."}
+{"timestamp":"2026-09-20T23:24:33Z","action":"execute_self_update","pipeline_id":"pipe-3","step_id":"step-3","success":false,"error":"SECURITY ALERT: This agent is in strict production mode and requires a cryptographically signed update. No signature was provided. Update aborted."}
+{"timestamp":"2026-09-20T23:24:39Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-20T23:24:45Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"Failed to download update: bad status: 404 Not Found"}
+{"timestamp":"2026-09-20T23:24:51Z","action":"execute_self_update","pipeline_id":"456","step_id":"123","success":false,"error":"Failed to download update: Get \"http://fake-url.com/update\": dial tcp4 192.99.11.219:80: i/o timeout"}
+{"timestamp":"2026-09-20T23:43:55Z","action":"start-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:43:55Z","action":"stop-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:43:55Z","action":"execute_self_update","pipeline_id":"1","step_id":"1","success":false,"error":"Failed to download update: Get \"http://test\": dial tcp4: lookup test on 127.0.0.53:53: server misbehaving"}
+{"timestamp":"2026-09-20T23:43:55Z","action":"execute_raw_command","step_id":"req1","command":"ls","success":true}
+{"timestamp":"2026-09-20T23:43:55Z","action":"download_file_from_dashboard","step_id":"req3","command":"/tmp/b","success":false,"error":"\u003c!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"\u003e\n\u003chtml\u003e\u003chead\u003e\n\u003ctitle\u003e404 Not Found\u003c/title\u003e\n\u003c/head\u003e\u003cbody\u003e\n\u003ch1\u003eNot Found\u003c/h1\u003e\n\u003cp\u003eThe requested URL was not found on this server.\u003c/p\u003e\n\u003chr\u003e\n\u003caddress\u003eApache/2.4.66 (Ubuntu) Server at localhost Port 80\u003c/address\u003e\n\u003c/body\u003e\u003c/html\u003e\n"}
+{"timestamp":"2026-09-20T23:43:55Z","action":"kill-process","command":"1234","success":true}
+{"timestamp":"2026-09-20T23:43:55Z","action":"sync-cron-jobs","success":true}
+{"timestamp":"2026-09-20T23:43:55Z","action":"execute_command","pipeline_id":"pipe-e2e","step_id":"step-e2e","command":"echo E2E_Test_Success","success":true}
+{"timestamp":"2026-09-20T23:43:56Z","action":"execute_raw_command","step_id":"req-1","command":"echo hello world","success":true}
+{"timestamp":"2026-09-20T23:43:56Z","action":"execute_raw_command","step_id":"req-timeout","command":"sleep 2","success":false,"error":"signal: killed"}
+{"timestamp":"2026-09-20T23:43:56Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-20T23:43:56Z","action":"file_write-file","pipeline_id":"pipe-1","step_id":"step-1","command":"/tmp/rasnuos_file_test1884866403/test.txt","success":true}
+{"timestamp":"2026-09-20T23:43:56Z","action":"file_read-file","pipeline_id":"pipe-1","step_id":"step-2","command":"/tmp/rasnuos_file_test1884866403/test.txt","success":true}
+{"timestamp":"2026-09-20T23:43:56Z","action":"file_list-directory","pipeline_id":"pipe-1","step_id":"step-3","command":"/tmp/rasnuos_file_test1884866403","success":true}
+{"timestamp":"2026-09-20T23:43:56Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1884866403/does-not-exist.txt","success":false,"error":"File not found or inaccessible: stat /tmp/rasnuos_file_test1884866403/does-not-exist.txt: no such file or directory"}
+{"timestamp":"2026-09-20T23:43:56Z","action":"file_write-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1884866403/bad.txt","success":false,"error":"Failed to decode base64 content: illegal base64 data at input byte 4"}
+{"timestamp":"2026-09-20T23:43:56Z","action":"file_delete-file","pipeline_id":"pipe-1","step_id":"step-4","command":"/tmp/rasnuos_file_test1884866403/test.txt","success":true}
+{"timestamp":"2026-09-20T23:43:56Z","action":"file_unknown-action","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1884866403/unknown.txt","success":false,"error":"Unknown file action"}
+{"timestamp":"2026-09-20T23:43:56Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1884866403","success":false,"error":"Cannot read non-regular files (devices, pipes, sockets)"}
+{"timestamp":"2026-09-20T23:43:56Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1884866403/large.txt","success":false,"error":"File is too large for WebSocket transfer (\u003e5MB). Use secure download instead."}
+{"timestamp":"2026-09-20T23:43:56Z","action":"file_download-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1884866403/dl.txt","success":false,"error":"URL is required for download"}
+{"timestamp":"2026-09-20T23:43:56Z","action":"file_upload-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test1884866403/large.txt","success":false,"error":"URL is required for upload"}
+{"timestamp":"2026-09-20T23:43:56Z","action":"upload_file_to_dashboard","step_id":"pipe","command":"/tmp/test_upload1901609115/source.txt","success":true}
+{"timestamp":"2026-09-20T23:43:56Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download2675187746/target1.txt","success":true}
+{"timestamp":"2026-09-20T23:43:56Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download2675187746/target2.txt","success":false,"error":"SHA256 hash mismatch"}
+{"timestamp":"2026-09-20T23:43:56Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_disk_full2012793129/readonly/should_fail.txt","success":false,"error":"open /tmp/test_disk_full2012793129/readonly/should_fail.txt: permission denied"}
+{"timestamp":"2026-09-20T23:44:17Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:44:17Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:44:17Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:44:17Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:44:17Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:44:17Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:44:17Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:44:17Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:44:17Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:44:17Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:44:17Z","action":"restart-service","pipeline_id":"456","step_id":"123","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:44:17Z","action":"kill-process","pipeline_id":"456","step_id":"123","command":"9999","success":true}
+{"timestamp":"2026-09-20T23:44:18Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-20T23:44:18Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-20T23:44:24Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"SECURITY ALERT: Signature verification failed. The update payload may have been tampered with."}
+{"timestamp":"2026-09-20T23:44:30Z","action":"execute_self_update","pipeline_id":"pipe-3","step_id":"step-3","success":false,"error":"SECURITY ALERT: This agent is in strict production mode and requires a cryptographically signed update. No signature was provided. Update aborted."}
+{"timestamp":"2026-09-20T23:44:36Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-20T23:44:42Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"Failed to download update: bad status: 404 Not Found"}
+{"timestamp":"2026-09-20T23:44:47Z","action":"execute_self_update","pipeline_id":"456","step_id":"123","success":false,"error":"Failed to download update: Get \"http://fake-url.com/update\": dial tcp4 192.99.11.219:80: i/o timeout"}
+{"timestamp":"2026-09-20T23:46:39Z","action":"start-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:46:39Z","action":"stop-service","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:46:39Z","action":"kill-process","command":"1234","success":true}
+{"timestamp":"2026-09-20T23:46:39Z","action":"sync-cron-jobs","success":true}
+{"timestamp":"2026-09-20T23:46:39Z","action":"execute_self_update","pipeline_id":"1","step_id":"1","success":false,"error":"Failed to download update: Get \"http://test\": dial tcp4: lookup test on 127.0.0.53:53: server misbehaving"}
+{"timestamp":"2026-09-20T23:46:39Z","action":"download_file_from_dashboard","step_id":"req3","command":"/tmp/b","success":false,"error":"\u003c!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"\u003e\n\u003chtml\u003e\u003chead\u003e\n\u003ctitle\u003e404 Not Found\u003c/title\u003e\n\u003c/head\u003e\u003cbody\u003e\n\u003ch1\u003eNot Found\u003c/h1\u003e\n\u003cp\u003eThe requested URL was not found on this server.\u003c/p\u003e\n\u003chr\u003e\n\u003caddress\u003eApache/2.4.66 (Ubuntu) Server at localhost Port 80\u003c/address\u003e\n\u003c/body\u003e\u003c/html\u003e\n"}
+{"timestamp":"2026-09-20T23:46:39Z","action":"execute_raw_command","step_id":"req1","command":"ls","success":true}
+{"timestamp":"2026-09-20T23:46:39Z","action":"execute_command","pipeline_id":"pipe-e2e","step_id":"step-e2e","command":"echo E2E_Test_Success","success":true}
+{"timestamp":"2026-09-20T23:46:40Z","action":"execute_raw_command","step_id":"req-1","command":"echo hello world","success":true}
+{"timestamp":"2026-09-20T23:46:40Z","action":"execute_raw_command","step_id":"req-timeout","command":"sleep 2","success":false,"error":"signal: killed"}
+{"timestamp":"2026-09-20T23:46:40Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-20T23:46:40Z","action":"file_write-file","pipeline_id":"pipe-1","step_id":"step-1","command":"/tmp/rasnuos_file_test3581998977/test.txt","success":true}
+{"timestamp":"2026-09-20T23:46:40Z","action":"file_read-file","pipeline_id":"pipe-1","step_id":"step-2","command":"/tmp/rasnuos_file_test3581998977/test.txt","success":true}
+{"timestamp":"2026-09-20T23:46:40Z","action":"file_list-directory","pipeline_id":"pipe-1","step_id":"step-3","command":"/tmp/rasnuos_file_test3581998977","success":true}
+{"timestamp":"2026-09-20T23:46:40Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3581998977/does-not-exist.txt","success":false,"error":"File not found or inaccessible: stat /tmp/rasnuos_file_test3581998977/does-not-exist.txt: no such file or directory"}
+{"timestamp":"2026-09-20T23:46:40Z","action":"file_write-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3581998977/bad.txt","success":false,"error":"Failed to decode base64 content: illegal base64 data at input byte 4"}
+{"timestamp":"2026-09-20T23:46:40Z","action":"file_delete-file","pipeline_id":"pipe-1","step_id":"step-4","command":"/tmp/rasnuos_file_test3581998977/test.txt","success":true}
+{"timestamp":"2026-09-20T23:46:40Z","action":"file_unknown-action","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3581998977/unknown.txt","success":false,"error":"Unknown file action"}
+{"timestamp":"2026-09-20T23:46:40Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3581998977","success":false,"error":"Cannot read non-regular files (devices, pipes, sockets)"}
+{"timestamp":"2026-09-20T23:46:40Z","action":"file_read-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3581998977/large.txt","success":false,"error":"File is too large for WebSocket transfer (\u003e5MB). Use secure download instead."}
+{"timestamp":"2026-09-20T23:46:40Z","action":"file_download-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3581998977/dl.txt","success":false,"error":"URL is required for download"}
+{"timestamp":"2026-09-20T23:46:40Z","action":"file_upload-file","pipeline_id":"pipe-err","step_id":"step-err","command":"/tmp/rasnuos_file_test3581998977/large.txt","success":false,"error":"URL is required for upload"}
+{"timestamp":"2026-09-20T23:46:40Z","action":"upload_file_to_dashboard","step_id":"pipe","command":"/tmp/test_upload2701442713/source.txt","success":true}
+{"timestamp":"2026-09-20T23:46:40Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download3529778546/target1.txt","success":true}
+{"timestamp":"2026-09-20T23:46:40Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_download3529778546/target2.txt","success":false,"error":"SHA256 hash mismatch"}
+{"timestamp":"2026-09-20T23:46:40Z","action":"download_file_from_dashboard","step_id":"pipe","command":"/tmp/test_disk_full3905932204/readonly/should_fail.txt","success":false,"error":"open /tmp/test_disk_full3905932204/readonly/should_fail.txt: permission denied"}
+{"timestamp":"2026-09-20T23:47:01Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:47:01Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:47:01Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:47:01Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:47:01Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:47:01Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:47:01Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:47:01Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:47:01Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:47:01Z","action":"execute_command","step_id":"step1","command":"sleep 10","success":true}
+{"timestamp":"2026-09-20T23:47:01Z","action":"restart-service","pipeline_id":"456","step_id":"123","command":"nginx","success":true}
+{"timestamp":"2026-09-20T23:47:01Z","action":"kill-process","pipeline_id":"456","step_id":"123","command":"9999","success":true}
+{"timestamp":"2026-09-20T23:47:02Z","action":"execute_discovery","command":"INTERNAL_DISCOVERY_SCRIPT","success":true}
+{"timestamp":"2026-09-20T23:47:02Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-20T23:47:08Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"SECURITY ALERT: Signature verification failed. The update payload may have been tampered with."}
+{"timestamp":"2026-09-20T23:47:14Z","action":"execute_self_update","pipeline_id":"pipe-3","step_id":"step-3","success":false,"error":"SECURITY ALERT: This agent is in strict production mode and requires a cryptographically signed update. No signature was provided. Update aborted."}
+{"timestamp":"2026-09-20T23:47:20Z","action":"execute_self_update","pipeline_id":"pipe-1","step_id":"step-1","success":true}
+{"timestamp":"2026-09-20T23:47:26Z","action":"execute_self_update","pipeline_id":"pipe-2","step_id":"step-2","success":false,"error":"Failed to download update: bad status: 404 Not Found"}
+{"timestamp":"2026-09-20T23:47:31Z","action":"execute_self_update","pipeline_id":"456","step_id":"123","success":false,"error":"Failed to download update: Get \"http://fake-url.com/update\": dial tcp4 192.99.11.219:80: i/o timeout"}

@@ -19,8 +19,7 @@ import (
 )
 
 // version is set at build time via -ldflags "-X main.version=x.y.z".
-// Falls back to "dev" for local builds.
-var version = "dev"
+var version = "1.0.0"
 
 // firstNonEmpty prefers an explicit CLI flag but falls back to the environment so that
 // production installs can source secrets from a chmod-600 EnvironmentFile instead of
@@ -62,7 +61,16 @@ func buildServerURL(flagValue string) string {
 		appKey = "rasnuos-key"
 	}
 
-	return fmt.Sprintf("%s://%s:%s/app/%s?protocol=7&client=rasnuos-agent&version=1.0.0", scheme, host, port, appKey)
+	// Omit port from the URL when it's the default for the scheme.
+	// When the agent connects via wss:// (behind Cloudflare/nginx), including
+	// port 8080 would bypass the reverse proxy and hit Reverb directly over
+	// an unencrypted socket, causing broken pipe errors.
+	hostPort := fmt.Sprintf("%s:%s", host, port)
+	if (scheme == "wss" && port == "443") || (scheme == "ws" && port == "80") {
+		hostPort = host
+	}
+
+	return fmt.Sprintf("%s://%s/app/%s?protocol=7&client=rasnuos-agent&version=1.0.0", scheme, hostPort, appKey)
 }
 
 // runAgent contains the full agent lifecycle. It accepts an external shutdown
@@ -126,10 +134,12 @@ func runAgent(args []string, shutdown chan struct{}) error {
 	go client.ConnectAndMonitor(shutdown)
 	go client.StartMetricsEngine(shutdown)
 	go CleanupIdleSessions(shutdown)
+	StartMetricsServer(shutdown) // Milestone 3.3: /healthz + /metrics endpoints
 
 	<-shutdown
 
 	log.Printf("Shutdown signal received, stopping agent...")
+	client.CancelAllCommands()
 	client.WaitCommands()
 	log.Println("Agent stopped.")
 	return nil
@@ -166,4 +176,3 @@ func main() {
 		log.Fatal(err)
 	}
 }
-

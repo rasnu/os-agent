@@ -63,6 +63,12 @@ type OSAdapter interface {
 	// Firewall
 	PunchFirewallHole(port int) error
 	CloseFirewallHole(port int) error
+
+	// GUI Automation
+	ExecuteComputerAction(action, text string, x, y int) ([]byte, error)
+
+	// Fingerprinting
+	GetMachineID() string
 }
 
 var currentAdapter OSAdapter

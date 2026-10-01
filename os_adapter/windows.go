@@ -7,8 +7,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sort"
+	"strings"
+	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
@@ -181,8 +184,11 @@ func (a *WindowsAdapter) InstallService(executablePath string) error {
 }
 
 func (a *WindowsAdapter) UninstallService() error {
-	exec.Command("powershell", "-NoProfile", "-Command", `Stop-Service -Name "RasnuOSAgent"`).Run()
-	return exec.Command("powershell", "-NoProfile", "-Command", `Remove-Service -Name "RasnuOSAgent"`).Run()
+	// Stop the service gracefully first (ignore errors — it may already be stopped)
+	exec.Command("powershell", "-NoProfile", "-Command", `Stop-Service -Name "RasnuOSAgent" -Force -ErrorAction SilentlyContinue`).Run()
+	// Use sc.exe delete — works on ALL Windows versions (Vista+).
+	// Remove-Service only exists in PowerShell 6+ (Core), not the default PS 5.1.
+	return exec.Command("sc.exe", "delete", "RasnuOSAgent").Run()
 }
 
 type WindowsPTY struct {
@@ -247,7 +253,6 @@ func getSwapUsage() (float64, error) {
 	}
 	return s.UsedPercent, nil
 }
-
 
 func getLoadAvg() (string, error) {
 	l, err := load.Avg()
@@ -331,17 +336,169 @@ func getTopProcesses() ([]Process, error) {
 	return result, nil
 }
 
-
 func (a *WindowsAdapter) PunchFirewallHole(port int) error {
-	portStr := fmt.Sprintf("%d", port)
-	ruleName := fmt.Sprintf("RasnuOS Agent Port %s", portStr)
-	exec.Command("netsh", "advfirewall", "firewall", "add", "rule", fmt.Sprintf("name=%s", ruleName), "dir=in", "action=allow", "protocol=TCP", fmt.Sprintf("localport=%s", portStr)).Run()
-	return nil
+	cmdStr := fmt.Sprintf(`New-NetFirewallRule -DisplayName "RasnuOS Port %d" -Direction Inbound -LocalPort %d -Protocol TCP -Action Allow`, port, port)
+	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", cmdStr)
+	return cmd.Run()
 }
 
 func (a *WindowsAdapter) CloseFirewallHole(port int) error {
-	portStr := fmt.Sprintf("%d", port)
-	ruleName := fmt.Sprintf("RasnuOS Agent Port %s", portStr)
-	exec.Command("netsh", "advfirewall", "firewall", "delete", "rule", fmt.Sprintf("name=%s", ruleName)).Run()
-	return nil
+	cmdStr := fmt.Sprintf(`Remove-NetFirewallRule -DisplayName "RasnuOS Port %d" -ErrorAction SilentlyContinue`, port)
+	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", cmdStr)
+	return cmd.Run()
+}
+
+func (a *WindowsAdapter) ExecuteComputerAction(action, text string, x, y int) ([]byte, error) {
+	// Because the Go Agent runs as a Windows Service in Session 0, we cannot interact
+	// with the GUI directly. We must write a PowerShell script and launch it in the interactive session.
+	// Securely escape strings for PowerShell single-quote literal strings
+	safeAction := strings.ReplaceAll(action, `'`, `''`)
+	safeText := strings.ReplaceAll(text, `'`, `''`)
+
+	unixTime := time.Now().UnixNano()
+	scriptPath := fmt.Sprintf(`C:\Windows\Temp\rasnuos_gui_%d.ps1`, unixTime)
+	outPath := fmt.Sprintf(`C:\Windows\Temp\rasnuos_screen_%d.png`, unixTime)
+	outTxtPath := fmt.Sprintf(`C:\Windows\Temp\rasnuos_out_%d.txt`, unixTime)
+
+	// Prevent temp file leaks on error/panic
+	defer os.Remove(scriptPath)
+	defer os.Remove(outPath)
+	defer os.Remove(outTxtPath)
+
+	psScript := `
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern void mouse_event(int flags, int dx, int dy, int buttons, int extraInfo); [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);' -Name Native -Namespace Win32
+
+$action = '` + safeAction + `'
+$x = ` + fmt.Sprintf("%d", x) + `
+$y = ` + fmt.Sprintf("%d", y) + `
+$text = '` + safeText + `'
+$outPath = '` + outPath + `'
+$outTxtPath = '` + outTxtPath + `'
+
+try {
+	switch ($action) {
+		"open_application" { 
+			$app = $text
+			if ($text.ToLower() -eq "terminal") { 
+				if (Get-Command wt.exe -ErrorAction SilentlyContinue) { $app = "wt.exe" } else { $app = "cmd.exe" }
+			}
+			elseif ($text.ToLower() -eq "file manager" -or $text.ToLower() -eq "explorer") { $app = "explorer.exe" }
+			elseif ($text.ToLower() -eq "browser") { 
+                Start-Process "https://google.com"
+                return
+            }
+			Start-Process $app 
+		}
+		"list_windows" {
+			$titles = Get-Process | Where-Object {$_.MainWindowTitle} | Select-Object -ExpandProperty MainWindowTitle
+			($titles -join [Environment]::NewLine) | Out-File -FilePath $outTxtPath -Encoding UTF8
+		}
+		"activate_window" {
+			Add-Type @"
+			using System;
+			using System.Runtime.InteropServices;
+			public class Win32 {
+				[DllImport("user32.dll")]
+				[return: MarshalAs(UnmanagedType.Bool)]
+				public static extern bool SetForegroundWindow(IntPtr hWnd);
+			}
+"@
+			$proc = Get-Process | Where-Object {$_.MainWindowTitle -match $text} | Select-Object -First 1
+			if ($proc) {
+				[Win32]::SetForegroundWindow($proc.MainWindowHandle)
+			}
+		}
+		"close_window" {
+			$proc = Get-Process | Where-Object {$_.MainWindowTitle -match $text} | Select-Object -First 1
+			if ($proc) {
+				$proc.CloseMainWindow()
+			}
+		}
+		"move_window", "resize_window" {
+			Add-Type @"
+			using System;
+			using System.Runtime.InteropServices;
+			public class Win32Move {
+				[DllImport("user32.dll", SetLastError = true)]
+				public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+				[DllImport("user32.dll")]
+				public static extern bool GetWindowRect(IntPtr hwnd, out RECT lpRect);
+				public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+			}
+"@
+			$proc = Get-Process | Where-Object {$_.MainWindowTitle -match $text} | Select-Object -First 1
+			if ($proc) {
+				$rect = New-Object Win32Move+RECT
+				[Win32Move]::GetWindowRect($proc.MainWindowHandle, [ref]$rect)
+				$width = $rect.Right - $rect.Left
+				$height = $rect.Bottom - $rect.Top
+				if ($action -eq "move_window") {
+					[Win32Move]::MoveWindow($proc.MainWindowHandle, $x, $y, $width, $height, $true)
+				} else {
+					[Win32Move]::MoveWindow($proc.MainWindowHandle, $rect.Left, $rect.Top, $x, $y, $true)
+				}
+			}
+		}
+		"mouse_move" { [Win32.Native]::SetCursorPos($x, $y) }
+		"left_click" { [Win32.Native]::mouse_event(0x02, 0, 0, 0, 0); [Win32.Native]::mouse_event(0x04, 0, 0, 0, 0) }
+		"right_click" { [Win32.Native]::mouse_event(0x08, 0, 0, 0, 0); [Win32.Native]::mouse_event(0x10, 0, 0, 0, 0) }
+		"double_click" { [Win32.Native]::mouse_event(0x02, 0, 0, 0, 0); [Win32.Native]::mouse_event(0x04, 0, 0, 0, 0); Start-Sleep -Milliseconds 100; [Win32.Native]::mouse_event(0x02, 0, 0, 0, 0); [Win32.Native]::mouse_event(0x04, 0, 0, 0, 0) }
+		"type" { [System.Windows.Forms.SendKeys]::SendWait($text) }
+		"key" { [System.Windows.Forms.SendKeys]::SendWait("{$text}") }
+		"screenshot" {
+			$bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+			$bmp = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+			$graphics = [System.Drawing.Graphics]::FromImage($bmp)
+			$graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+			$bmp.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Png)
+			$graphics.Dispose()
+			$bmp.Dispose()
+		}
+	}
+} catch {
+	Write-Error $_.Exception.Message
+}
+`
+	os.WriteFile(scriptPath, []byte(psScript), 0644)
+
+	// Create a command that uses _RasnuLaunchAsUser to execute the script in Session 1
+	// We handle output within the PS script (Out-File) to bypass shell redirection issues.
+	cmdStr := fmt.Sprintf("_RasnuLaunchAsUser powershell.exe '-ExecutionPolicy Bypass -WindowStyle Hidden -File %s'", scriptPath)
+	cmd := a.GetShellCmd(context.Background(), cmdStr, "")
+	err := cmd.Run()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to launch GUI task: %w", err)
+	}
+
+	// Read the text output file (e.g., from list_windows) if it exists
+	var outBytes []byte
+	if data, err := os.ReadFile(outTxtPath); err == nil {
+		outBytes = data
+	}
+
+	// If screenshot, wait a moment and read the file
+	if action == "screenshot" {
+		// Wait up to 5 seconds for the file to appear
+		for i := 0; i < 50; i++ {
+			if data, err := os.ReadFile(outPath); err == nil {
+				return data, nil
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		return nil, fmt.Errorf("screenshot file was not created by the interactive session")
+	}
+
+	return outBytes, nil
+}
+
+func (a *WindowsAdapter) GetMachineID() string {
+	// The standard way to get a machine ID on Windows is to read MachineGuid
+	out, err := exec.Command("powershell", "-NoProfile", "-Command", `(Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Cryptography' -Name 'MachineGuid').MachineGuid`).Output()
+	if err == nil {
+		return strings.TrimSpace(string(out))
+	}
+	return ""
 }

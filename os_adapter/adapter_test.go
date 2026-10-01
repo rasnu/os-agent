@@ -64,6 +64,14 @@ func (m *MockAdapter) CloseFirewallHole(port int) error {
 	return nil
 }
 
+func (m *MockAdapter) ExecuteComputerAction(action, text string, x, y int) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *MockAdapter) GetMachineID() string {
+	return "mock-machine-id"
+}
+
 func TestCurrentPanicsWhenNil(t *testing.T) {
 	// Ensure we start with nil for this test
 	originalAdapter := currentAdapter

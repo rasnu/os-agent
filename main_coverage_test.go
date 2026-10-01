@@ -28,7 +28,7 @@ func TestBuildServerURL_HttpToWs(t *testing.T) {
 	defer os.Unsetenv("REVERB_APP_KEY")
 
 	url := buildServerURL("")
-	if url != "ws://example.com:80/app/rasnuos_agent_key?protocol=7&client=rasnuos-agent&version=1.0.0" {
+	if url != "ws://example.com/app/rasnuos_agent_key?protocol=7&client=rasnuos-agent&version=1.0.0" {
 		t.Errorf("wrong URL generated: %s", url)
 	}
 }

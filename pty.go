@@ -7,6 +7,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,11 +15,17 @@ import (
 )
 
 type PTYSession struct {
-	ptyInstance  os_adapter.PTY
-	client       *PusherClient
-	termID       string
-	mu           sync.Mutex
-	lastActivity time.Time
+	ptyInstance      os_adapter.PTY
+	client           *PusherClient
+	termID           string
+	currentRequestID string
+	mu               sync.Mutex
+	lastActivity     time.Time
+	outputBuffer     string
+	isStalled        bool
+	isAgentOwned     bool
+	isClosed         bool
+	tickerStop       chan struct{}
 }
 
 var (
@@ -39,7 +46,6 @@ func CleanupIdleSessions(shutdownChan chan struct{}) {
 	for {
 		select {
 		case <-shutdownChan:
-			// On shutdown, close all active sessions
 			sessionMutex.Lock()
 			sessionsToClose := make([]*PTYSession, 0, len(activeSessions))
 			for termID, session := range activeSessions {
@@ -77,26 +83,48 @@ func CleanupIdleSessions(shutdownChan chan struct{}) {
 	}
 }
 
-func (c *PusherClient) StartTerminal(termID string) {
+func (c *PusherClient) StartTerminal(termID string, isAgentOwned bool, requestID string) *PTYSession {
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 
-	if _, exists := activeSessions[termID]; exists {
-		log.Printf("Terminal session %s already exists", termID)
-		return
+	if session, exists := activeSessions[termID]; exists {
+		session.mu.Lock()
+		closed := session.isClosed
+		session.mu.Unlock()
+
+		if closed {
+			// Stale entry — the session was closed but never removed from the map
+			// (e.g., TerminalStop whisper was lost during a server switch).
+			// Clean it up and fall through to create a fresh session below.
+			log.Printf("Terminal session %s exists but is closed — replacing with fresh session", termID)
+			delete(activeSessions, termID)
+			session.closeInternal()
+		} else {
+			log.Printf("Terminal session %s already exists and is alive", termID)
+			if isAgentOwned {
+				session.mu.Lock()
+				session.currentRequestID = requestID
+				session.isStalled = false
+				session.mu.Unlock()
+			}
+			return session
+		}
 	}
 
 	ptyInstance, err := os_adapter.Current().StartPTY(80, 24)
 	if err != nil {
 		log.Printf("Failed to start pty: %v", err)
-		return
+		return nil
 	}
 
 	session := &PTYSession{
-		ptyInstance:  ptyInstance,
-		client:       c,
-		termID:       termID,
-		lastActivity: time.Now(),
+		ptyInstance:      ptyInstance,
+		client:           c,
+		termID:           termID,
+		currentRequestID: requestID,
+		lastActivity:     time.Now(),
+		isAgentOwned:     isAgentOwned,
+		tickerStop:       make(chan struct{}),
 	}
 
 	activeSessions[termID] = session
@@ -112,11 +140,75 @@ func (c *PusherClient) StartTerminal(termID string) {
 		session.readLoop()
 	}()
 
-	log.Printf("Terminal session %s started", termID)
+	if isAgentOwned {
+		c.wg.Add(1)
+		go func() {
+			defer c.wg.Done()
+			session.activityMonitor()
+		}()
+	}
+
+	log.Printf("Terminal session %s started (AgentOwned: %v)", termID, isAgentOwned)
+	return session
+}
+
+func (s *PTYSession) activityMonitor() {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.tickerStop:
+			return
+		case <-ticker.C:
+			s.mu.Lock()
+			if s.isClosed || s.isStalled {
+				s.mu.Unlock()
+				continue
+			}
+
+			idleTime := time.Since(s.lastActivity)
+			buffer := s.outputBuffer
+			reqID := s.currentRequestID
+			s.mu.Unlock()
+
+			isStalled := false
+
+			// 1. Regex/Heuristic fast-track
+			if idleTime > 500*time.Millisecond && len(buffer) > 0 {
+				if strings.HasSuffix(buffer, "[y/N] ") ||
+					strings.HasSuffix(buffer, "password: ") ||
+					strings.HasSuffix(buffer, "Password: ") ||
+					strings.HasSuffix(buffer, "(yes/no) ") ||
+					strings.HasSuffix(buffer, "Select: ") ||
+					strings.HasSuffix(buffer, "? ") {
+					isStalled = true
+				}
+			}
+
+			// 2. Fallback timeout
+			if idleTime > 30*time.Second {
+				isStalled = true
+			}
+
+			if isStalled {
+				s.mu.Lock()
+				s.isStalled = true
+				s.outputBuffer = "" // Clear buffer so next stall only shows new data
+				s.mu.Unlock()
+
+				log.Printf("PTY %s stalled waiting for input. Firing webhook to reqID %s.", s.termID, reqID)
+				s.client.sendMigrationCompletion(reqID, reqID, true, buffer, map[string]interface{}{
+					"status":  "stalled",
+					"term_id": s.termID,
+				})
+			}
+		}
+	}
 }
 
 func (s *PTYSession) readLoop() {
-	buf := make([]byte, 4096) // Increased from 1024 to 4096 for better throughput
+	buf := make([]byte, 4096)
 	for {
 		n, err := s.ptyInstance.Read(buf)
 		if err != nil {
@@ -124,13 +216,28 @@ func (s *PTYSession) readLoop() {
 			break
 		}
 
-		// Update activity on read as well
 		s.mu.Lock()
 		s.lastActivity = time.Now()
+		s.isStalled = false
+		s.outputBuffer += string(buf[:n])
 		s.mu.Unlock()
 
-		// Send terminal output to client via WebSocket
+		// Send terminal output to UI client via WebSocket
 		s.client.streamTerminalOutput(s.termID, string(buf[:n]))
+	}
+
+	s.mu.Lock()
+	if s.isAgentOwned && !s.isClosed {
+		// Do NOT set isClosed=true here, let Close() handle it so tickerStop is safely closed
+		reqID := s.currentRequestID
+		finalBuf := s.outputBuffer
+		s.mu.Unlock()
+		s.client.sendMigrationCompletion(reqID, reqID, true, finalBuf, map[string]interface{}{
+			"status":  "finished",
+			"term_id": s.termID,
+		})
+	} else {
+		s.mu.Unlock()
 	}
 
 	s.Close()
@@ -139,6 +246,7 @@ func (s *PTYSession) readLoop() {
 func (s *PTYSession) Write(data []byte) error {
 	s.mu.Lock()
 	s.lastActivity = time.Now()
+	s.isStalled = false // typing something breaks the stall
 	s.mu.Unlock()
 
 	_, err := s.ptyInstance.Write(data)
@@ -153,7 +261,6 @@ func (s *PTYSession) Resize(rows, cols uint16) error {
 	return s.ptyInstance.Resize(cols, rows)
 }
 
-// closeInternal shuts down the process and closes files. Must NOT be called while holding sessionMutex.
 func (s *PTYSession) closeInternal() {
 	if s.ptyInstance != nil {
 		s.ptyInstance.Kill()
@@ -161,17 +268,22 @@ func (s *PTYSession) closeInternal() {
 	}
 }
 
-// Close is the public method to close a session
 func (s *PTYSession) Close() {
 	sessionMutex.Lock()
-	if _, exists := activeSessions[s.termID]; !exists {
-		sessionMutex.Unlock()
-		return
+	if _, exists := activeSessions[s.termID]; exists {
+		log.Printf("Closing terminal session %s", s.termID)
+		delete(activeSessions, s.termID)
 	}
-
-	log.Printf("Closing terminal session %s", s.termID)
-	delete(activeSessions, s.termID)
 	sessionMutex.Unlock()
+
+	s.mu.Lock()
+	if !s.isClosed {
+		s.isClosed = true
+		if s.tickerStop != nil {
+			close(s.tickerStop)
+		}
+	}
+	s.mu.Unlock()
 
 	s.closeInternal()
 }
@@ -183,7 +295,6 @@ func (c *PusherClient) streamTerminalOutput(termID string, data string) {
 	}
 	dataBytes, _ := json.Marshal(dataObj)
 
-	// Send a standard event that the frontend can listen to
 	payload := PusherClientEvent{
 		Event:   "client-TerminalOutput",
 		Channel: "private-server." + c.ServerID + ".terminal",

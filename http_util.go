@@ -34,12 +34,18 @@ func defaultTransport() http.RoundTripper {
 		return dialer.DialContext(ctx, "tcp4", addr)
 	}
 
+	// Fix for mobile/SIM networks: Cellular NAT gateways aggressively drop idle connections.
+	// If IdleConnTimeout is > 15s, the next metrics push will try to use a dead connection,
+	// causing it to hang and timeout. Setting this to 5s forces a fresh dial for periodic metrics
+	// while still allowing fast keep-alive reuse for high-frequency log streaming.
+	baseTransport.IdleConnTimeout = 5 * time.Second
+
 	return &userAgentRoundTripper{inner: baseTransport}
 }
 
 var (
-	defaultHTTPClient      HTTPDoer = &http.Client{Timeout: 10 * time.Second, Transport: defaultTransport()}
-	heartbeatHTTPClient    HTTPDoer = &http.Client{Timeout: 5 * time.Second, Transport: defaultTransport()}
+	defaultHTTPClient      HTTPDoer = &http.Client{Timeout: 30 * time.Second, Transport: defaultTransport()}
+	heartbeatHTTPClient    HTTPDoer = &http.Client{Timeout: 30 * time.Second, Transport: defaultTransport()}
 	updaterHTTPClient      HTTPDoer = &http.Client{Timeout: 240 * time.Second, Transport: defaultTransport()}
 	fileTransferHTTPClient HTTPDoer = &http.Client{Timeout: 0, Transport: defaultTransport()}
 )

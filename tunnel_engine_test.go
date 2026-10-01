@@ -30,6 +30,10 @@ func (m *DummyAdapter) WriteCronJobs(content string) error                   { r
 func (m *DummyAdapter) LogFilePath() string                                  { return "" }
 func (m *DummyAdapter) PunchFirewallHole(port int) error                     { return nil }
 func (m *DummyAdapter) CloseFirewallHole(port int) error                     { return nil }
+func (m *DummyAdapter) ExecuteComputerAction(action, text string, x, y int) ([]byte, error) {
+	return nil, nil
+}
+func (m *DummyAdapter) GetMachineID() string { return "dummy-machine-id" }
 
 func TestTunnelEngine_EndToEnd(t *testing.T) {
 	// Mock OS adapter

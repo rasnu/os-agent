@@ -3,36 +3,53 @@ set -e
 
 echo "Building all 6 RasnuOS Enterprise Agent variants..."
 
-cd $(dirname "$0")
+cd "$(dirname "$0")"
+
+# ── Build metadata ──────────────────────────────────────────────────────────────
+VERSION="1.0.0"
+BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+LDFLAGS="-s -w -X main.version=${VERSION}"
+
+echo "Version  : ${VERSION}"
+echo "Built at : ${BUILD_TIME}"
+echo ""
 
 # Ensure output directory exists
-mkdir -p ../public/agent-binaries
+mkdir -p ../backend/public/agent-binaries
 
 # 1. Linux
 echo "Building Linux AMD64..."
-GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ../public/agent-binaries/rasnuos-agent-linux-amd64 .
+GOOS=linux GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o ../backend/public/agent-binaries/rasnuos-agent-linux-amd64 .
+
 echo "Building Linux ARM64..."
-GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ../public/agent-binaries/rasnuos-agent-linux-arm64 .
+GOOS=linux GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o ../backend/public/agent-binaries/rasnuos-agent-linux-arm64 .
 
 # 2. Windows
 echo "Building Windows AMD64..."
-GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o ../public/agent-binaries/rasnuos-agent-windows-amd64.exe .
+GOOS=windows GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o ../backend/public/agent-binaries/rasnuos-agent-windows-amd64.exe .
+
 echo "Building Windows ARM64..."
-GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o ../public/agent-binaries/rasnuos-agent-windows-arm64.exe .
+GOOS=windows GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o ../backend/public/agent-binaries/rasnuos-agent-windows-arm64.exe .
 
 # 3. macOS
 echo "Building macOS AMD64..."
-GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o ../public/agent-binaries/rasnuos-agent-macos-amd64 .
-echo "Building macOS ARM64..."
-GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o ../public/agent-binaries/rasnuos-agent-macos-arm64 .
+GOOS=darwin GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o ../backend/public/agent-binaries/rasnuos-agent-macos-amd64 .
 
+echo "Building macOS ARM64 (Apple Silicon)..."
+GOOS=darwin GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o ../backend/public/agent-binaries/rasnuos-agent-macos-arm64 .
+
+echo ""
 echo "Generating SHA-256 Checksums..."
-cd ../public/agent-binaries
+cd ../backend/public/agent-binaries
 for file in rasnuos-agent-*; do
-    if [ "${file##*.}" != "sha256" ]; then
-        sha256sum "$file" > "${file}.sha256"
-        echo "  - ${file}.sha256"
+    if [[ "${file}" != *.sha256 ]]; then
+        sha256sum "${file}" > "${file}.sha256"
+        echo "  ✓ ${file}.sha256"
     fi
 done
 
-echo "✅ All 6 Enterprise binaries built and signed successfully!"
+echo ""
+echo "Final binary inventory:"
+ls -lh rasnuos-agent-* | grep -v sha256
+echo ""
+echo "✅ All 6 Enterprise binaries built successfully! Version: ${VERSION}"

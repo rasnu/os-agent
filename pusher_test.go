@@ -22,8 +22,8 @@ func TestPusherDataString_ParsesEventAndData(t *testing.T) {
 	if msg.Event != "ExecuteCommand" {
 		t.Errorf("Event = %q; want ExecuteCommand", msg.Event)
 	}
-	if !strings.Contains(msg.Data, "step-1") {
-		t.Errorf("Data should contain step_id, got: %q", msg.Data)
+	if !strings.Contains(string(msg.Data), "step-1") {
+		t.Errorf("Data should contain step_id, got: %q", string(msg.Data))
 	}
 }
 
@@ -38,8 +38,15 @@ func TestPusherDataString_ParsesConnectionEstablished(t *testing.T) {
 		t.Errorf("Event = %q; want pusher:connection_established", msg.Event)
 	}
 
+	// msg.Data is json.RawMessage — in Pusher's protocol the inner payload is a
+	// JSON-encoded string (double-encoded), so we first unmarshal to a string.
+	var innerStr string
+	if err := json.Unmarshal(msg.Data, &innerStr); err != nil {
+		t.Fatalf("inner data string unmarshal failed: %v", err)
+	}
+
 	var data map[string]interface{}
-	if err := json.Unmarshal([]byte(msg.Data), &data); err != nil {
+	if err := json.Unmarshal([]byte(innerStr), &data); err != nil {
 		t.Fatalf("inner data json.Unmarshal failed: %v", err)
 	}
 
@@ -122,7 +129,7 @@ func TestChannelNames_Format(t *testing.T) {
 // ─── Safe Parsing Helpers ─────────────────────────────────────────────────────
 
 func TestParseEventData_Valid(t *testing.T) {
-	raw := `{"step_id":"step-1","command":"ls -la"}`
+	raw := json.RawMessage(`{"step_id":"step-1","command":"ls -la"}`)
 	payload := parseEventData("TestEvent", raw)
 	if payload == nil {
 		t.Fatal("expected non-nil payload")
@@ -133,7 +140,7 @@ func TestParseEventData_Valid(t *testing.T) {
 }
 
 func TestParseEventData_Invalid(t *testing.T) {
-	raw := `{"broken json`
+	raw := json.RawMessage(`{"broken json`)
 	payload := parseEventData("TestEvent", raw)
 	if payload != nil {
 		t.Fatalf("expected nil payload on invalid json, got %v", payload)
