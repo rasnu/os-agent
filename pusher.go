@@ -577,6 +577,14 @@ func (c *PusherClient) handleAgentCommand(command string, args map[string]interf
 	stepId := getString(args, "step_id")
 
 	switch command {
+	case "update_config":
+		log.Printf("Received dynamic autopilot_config update via WebSocket")
+		if thresholdsRaw, ok := args["thresholds"]; ok {
+			if thresholds, ok := thresholdsRaw.(map[string]interface{}); ok {
+				UpdateAlertThresholds(thresholds)
+			}
+		}
+
 	case "execute-self-update":
 		downloadUrl := getString(args, "download_url")
 		if downloadUrl == "" {
@@ -901,6 +909,13 @@ func (c *PusherClient) sendHeartbeatWithStatus() error {
 			}
 			if c.logTailer != nil {
 				c.logTailer.UpdateMonitoredLogs(strLogs)
+			}
+		}
+		if config, ok := res["autopilot_config"].(map[string]interface{}); ok {
+			if thresholdsRaw, ok := config["thresholds"]; ok {
+				if thresholds, ok := thresholdsRaw.(map[string]interface{}); ok {
+					UpdateAlertThresholds(thresholds)
+				}
 			}
 		}
 	}

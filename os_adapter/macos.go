@@ -57,11 +57,13 @@ func (a *MacOSAdapter) GetMetrics() (Metrics, []error) {
 		metrics.SwapUsage = swapMem.UsedPercent
 	}
 
-	if val, err := getLoadAvg(); err != nil {
+	if l_str, l_5, err := getLoadAvg(); err != nil {
 		errs = append(errs, fmt.Errorf("load: %w", err))
 	} else {
-		metrics.LoadAvg = val
+		metrics.LoadAvg = l_str
+		metrics.Load5 = l_5
 	}
+	metrics.CPUCores, _ = cpu.Counts(true)
 
 	if rx, tx, err := getMacNetworkIO(); err != nil {
 		errs = append(errs, fmt.Errorf("network_io: %w", err))
@@ -89,7 +91,25 @@ func (a *MacOSAdapter) GetMetrics() (Metrics, []error) {
 		metrics.Services = services
 	}
 
+	metrics.OOMKills = getOOMKills()
+
 	return metrics, errs
+}
+
+func getOOMKills() []string {
+	var ooms []string
+	// macOS uses Jetsam for memory management. We look for recent Jetsam logs.
+	cmdStr := `log show --predicate "eventMessage contains 'Jetsam'" --last 5m 2>/dev/null | grep Jetsam | tail -n 5`
+	out, err := exec.Command("sh", "-c", cmdStr).Output()
+	if err == nil && len(out) > 0 {
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		for _, line := range lines {
+			if strings.TrimSpace(line) != "" {
+				ooms = append(ooms, strings.TrimSpace(line))
+			}
+		}
+	}
+	return ooms
 }
 
 func (a *MacOSAdapter) GetShellCmd(ctx context.Context, script string, runAsUser string) *exec.Cmd {
@@ -227,12 +247,12 @@ func getDiskUsage() (float64, error) {
 	return d.UsedPercent, nil
 }
 
-func getLoadAvg() (string, error) {
+func getLoadAvg() (string, float64, error) {
 	l, err := load.Avg()
 	if err != nil {
-		return "", err
+		return "", 0.0, err
 	}
-	return fmt.Sprintf("%.2f, %.2f, %.2f", l.Load1, l.Load5, l.Load15), nil
+	return fmt.Sprintf("%.2f, %.2f, %.2f", l.Load1, l.Load5, l.Load15), l.Load5, nil
 }
 
 // getMacNetworkIO sums bytes received/sent across all non-loopback interfaces.
@@ -327,6 +347,34 @@ func getServiceStatuses() ([]ServiceStatus, error) {
 			Status: status,
 		})
 	}
+
+	// --- Dynamic Failure Auto-Discovery (macOS Zero-Config) ---
+	// Find any service that exited with a non-zero status code (crash).
+	// We filter out native Apple OS services to avoid noise.
+	cmdStr := `launchctl list | awk '$1 == "-" && $2 != "0" && $3 !~ /^com\.apple\./ {print $3}'`
+	failedOut, err := exec.Command("sh", "-c", cmdStr).Output()
+	if err == nil && len(failedOut) > 0 {
+		lines := strings.Split(strings.TrimSpace(string(failedOut)), "\n")
+		for _, line := range lines {
+			failedSrv := strings.TrimSpace(line)
+			if failedSrv != "" {
+				alreadyAdded := false
+				for _, s := range statuses {
+					if s.Name == failedSrv {
+						alreadyAdded = true
+						break
+					}
+				}
+				if !alreadyAdded {
+					statuses = append(statuses, ServiceStatus{
+						Name:   failedSrv,
+						Status: "failed", // Map macOS crash state to unified "failed" status
+					})
+				}
+			}
+		}
+	}
+
 	return statuses, nil
 }
 

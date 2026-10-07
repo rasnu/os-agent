@@ -23,6 +23,9 @@ type Metrics struct {
 	RAMUsage  float64
 	DiskUsage float64
 	SwapUsage float64
+	IOWait    float64
+	Load5     float64
+	CPUCores  int
 	LoadAvg   string
 	NetworkRX uint64
 	NetworkTX uint64
@@ -30,6 +33,7 @@ type Metrics struct {
 	DiskWrite uint64
 	Processes []Process
 	Services  []ServiceStatus
+	OOMKills  []string
 }
 
 type PTY interface {

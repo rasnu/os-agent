@@ -24,6 +24,9 @@ type MetricsPayload struct {
 	RAMUsage     float64                    `json:"ram_usage"`
 	DiskUsage    float64                    `json:"disk_usage"`
 	SwapUsage    float64                    `json:"swap_usage"`
+	IOWait       float64                    `json:"io_wait"`
+	Load5        float64                    `json:"load_5"`
+	CPUCores     int                        `json:"cpu_cores"`
 	LoadAvg      string                     `json:"load_average"`
 	NetworkRX    uint64                     `json:"network_rx"`
 	NetworkTX    uint64                     `json:"network_tx"`
@@ -31,6 +34,7 @@ type MetricsPayload struct {
 	DiskWrite    uint64                     `json:"disk_write_kb"`
 	Processes    []os_adapter.Process       `json:"processes"`
 	Services     []os_adapter.ServiceStatus `json:"services"`
+	OOMKills     []string                   `json:"oom_kills"`
 	Errors       []string                   `json:"errors"`
 	Timestamp    int64                      `json:"timestamp"`
 }
@@ -90,6 +94,9 @@ func (c *PusherClient) collectAndSendMetrics() {
 		RAMUsage:     metrics.RAMUsage,
 		DiskUsage:    metrics.DiskUsage,
 		SwapUsage:    metrics.SwapUsage,
+		IOWait:       metrics.IOWait,
+		Load5:        metrics.Load5,
+		CPUCores:     metrics.CPUCores,
 		LoadAvg:      metrics.LoadAvg,
 		NetworkRX:    metrics.NetworkRX,
 		NetworkTX:    metrics.NetworkTX,
@@ -97,6 +104,7 @@ func (c *PusherClient) collectAndSendMetrics() {
 		DiskWrite:    metrics.DiskWrite,
 		Processes:    metrics.Processes,
 		Services:     metrics.Services,
+		OOMKills:     metrics.OOMKills,
 		Errors:       errs,
 		Timestamp:    time.Now().Unix(),
 	}
@@ -114,6 +122,7 @@ func (c *PusherClient) collectAndSendMetrics() {
 	if len(metricsQueue) > 1 {
 		metricsQueue[len(metricsQueue)-2].Processes = make([]os_adapter.Process, 0)
 		metricsQueue[len(metricsQueue)-2].Services = make([]os_adapter.ServiceStatus, 0)
+		metricsQueue[len(metricsQueue)-2].OOMKills = make([]string, 0)
 	}
 
 	// Only spawn flush goroutine if not already flushing

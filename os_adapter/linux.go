@@ -57,11 +57,15 @@ func (a *LinuxAdapter) GetMetrics() (Metrics, []error) {
 		metrics.SwapUsage = val
 	}
 
-	if val, err := getLoadAvg(); err != nil {
+	metrics.IOWait = getIOWait()
+
+	if l_str, l_5, err := getLoadAvg(); err != nil {
 		errs = append(errs, fmt.Errorf("load: %w", err))
 	} else {
-		metrics.LoadAvg = val
+		metrics.LoadAvg = l_str
+		metrics.Load5 = l_5
 	}
+	metrics.CPUCores, _ = cpu.Counts(true)
 
 	if rx, tx, err := getNetworkIO(); err != nil {
 		errs = append(errs, fmt.Errorf("network: %w", err))
@@ -89,7 +93,23 @@ func (a *LinuxAdapter) GetMetrics() (Metrics, []error) {
 		metrics.Services = services
 	}
 
+	metrics.OOMKills = getOOMKills()
+
 	return metrics, errs
+}
+
+func getOOMKills() []string {
+	var ooms []string
+	out, err := exec.Command("sh", "-c", "dmesg -T | grep -i -E 'Out of memory: Killed process|oom-killer' | tail -n 5").Output()
+	if err == nil && len(out) > 0 {
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		for _, line := range lines {
+			if strings.TrimSpace(line) != "" {
+				ooms = append(ooms, strings.TrimSpace(line))
+			}
+		}
+	}
+	return ooms
 }
 
 func (a *LinuxAdapter) GetShellCmd(ctx context.Context, script string, runAsUser string) *exec.Cmd {
@@ -234,6 +254,19 @@ func getSwapUsage() (float64, error) {
 	return s.UsedPercent, nil
 }
 
+func getIOWait() float64 {
+	// Extracts current IO Wait percentage. vmstat is widely available on Linux.
+	// We take 2 samples over 1 second and grab the iowait column (usually $16) from the second sample.
+	out, err := exec.Command("sh", "-c", "vmstat 1 2 | tail -1 | awk '{print $16}'").Output()
+	if err == nil {
+		val := strings.TrimSpace(string(out))
+		var iowait float64
+		fmt.Sscanf(val, "%f", &iowait)
+		return iowait
+	}
+	return 0.0
+}
+
 func getDiskUsage() (float64, error) {
 	d, err := disk.Usage("/")
 	if err != nil {
@@ -242,12 +275,12 @@ func getDiskUsage() (float64, error) {
 	return d.UsedPercent, nil
 }
 
-func getLoadAvg() (string, error) {
+func getLoadAvg() (string, float64, error) {
 	l, err := load.Avg()
 	if err != nil {
-		return "", err
+		return "", 0.0, err
 	}
-	return fmt.Sprintf("%.2f, %.2f, %.2f", l.Load1, l.Load5, l.Load15), nil
+	return fmt.Sprintf("%.2f, %.2f, %.2f", l.Load1, l.Load5, l.Load15), l.Load5, nil
 }
 
 func getNetworkIO() (uint64, uint64, error) {
@@ -354,6 +387,34 @@ func getServiceStatuses() ([]ServiceStatus, error) {
 			})
 		}
 	}
+
+	// --- Dynamic Failure Auto-Discovery (Zero-Config Monitoring) ---
+	// Grab any service that has failed, even if it's not in the hardcoded dashboard list.
+	failedOut, err := exec.Command("systemctl", "list-units", "--type=service", "--state=failed", "--no-pager", "--no-legend").Output()
+	if err == nil && len(failedOut) > 0 {
+		lines := strings.Split(strings.TrimSpace(string(failedOut)), "\n")
+		for _, line := range lines {
+			parts := strings.Fields(line)
+			if len(parts) > 0 {
+				failedSrv := strings.TrimSuffix(parts[0], ".service")
+				// Check if we already added it from the hardcoded list
+				alreadyAdded := false
+				for _, s := range statuses {
+					if s.Name == failedSrv {
+						alreadyAdded = true
+						break
+					}
+				}
+				if !alreadyAdded {
+					statuses = append(statuses, ServiceStatus{
+						Name:   failedSrv,
+						Status: "failed",
+					})
+				}
+			}
+		}
+	}
+
 	return statuses, nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/pmezard/go-difflib/difflib"
 )
@@ -223,24 +224,42 @@ func handleMultiReplaceFileContent(payload IdeIntentPayload) (string, error) {
 		actualTargetLines := lines[start:end]
 		actualTargetContent := strings.Join(actualTargetLines, "\n")
 		expectedTargetContent := normalizeLineEndings(chunk.TargetContent)
+		expectedNorm := normalizeCodeBlockForMatch(expectedTargetContent)
+		
+		// Expected length in lines
+		expectedLen := len(strings.Split(expectedNorm, "\n"))
 
 		// Enterprise Fuzzy Matching: Trim trailing spaces/tabs on EVERY line to prevent LLM trailing whitespace hallucinations
-		if normalizeCodeBlockForMatch(actualTargetContent) != normalizeCodeBlockForMatch(expectedTargetContent) {
-			return "", fmt.Errorf("chunk %d validation failed: target_content does not match the file content at lines %d-%d.\nExpected:\n%s\n\nActual in file:\n%s", i+1, chunk.StartLine, chunk.EndLine, expectedTargetContent, actualTargetContent)
+		if normalizeCodeBlockForMatch(actualTargetContent) != expectedNorm {
+			// FALLBACK: The LLM probably hallucinated the line numbers.
+			// Let's slide a window across the entire file to find the correct start and end lines.
+			found := false
+			for searchStart := 0; searchStart <= len(lines)-expectedLen; searchStart++ {
+				searchEnd := searchStart + expectedLen
+				windowContent := strings.Join(lines[searchStart:searchEnd], "\n")
+				if normalizeCodeBlockForMatch(windowContent) == expectedNorm {
+					// We found the correct lines! Auto-correct the payload chunk so the replacement logic works later.
+					payload.ReplacementChunks[i].StartLine = searchStart + 1
+					payload.ReplacementChunks[i].EndLine = searchEnd
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				return "", fmt.Errorf("chunk %d validation failed: target_content does not match the file content at lines %d-%d, and could not be found anywhere else in the file.\nExpected:\n%s\n\nActual in file at given lines:\n%s", i+1, chunk.StartLine, chunk.EndLine, expectedTargetContent, actualTargetContent)
+			}
 		}
 	}
 
-	// Create backup
-	backupPath := payload.TargetFile + ".bak"
+	// Create persistent backup for Undo feature
+	backupPath := fmt.Sprintf("%s.bak_rasnuos_%d", payload.TargetFile, time.Now().Unix())
 	if err := os.WriteFile(backupPath, data, 0644); err != nil {
 		return "", fmt.Errorf("failed to create atomic backup: %v", err)
 	}
 
-	success := false
 	defer func() {
-		if success {
-			os.Remove(backupPath) // Clean up backup only if everything succeeds
-		}
+		// We purposefully do NOT delete the backup so the UI can "Undo" it later.
 	}()
 
 	// Create a copy of chunks to sort by StartLine descending
@@ -313,7 +332,6 @@ func handleMultiReplaceFileContent(payload IdeIntentPayload) (string, error) {
 		diffText = "No changes were made."
 	}
 
-	success = true
 	return fmt.Sprintf("Successfully updated %s\n\n```diff\n%s\n```", payload.TargetFile, diffText), nil
 }
 
@@ -383,6 +401,8 @@ func handleWriteToFile(payload IdeIntentPayload) (string, error) {
 		data, readErr := os.ReadFile(target)
 		if readErr == nil {
 			originalContent = normalizeLineEndings(string(data))
+			backupPath := fmt.Sprintf("%s.bak_rasnuos_%d", target, time.Now().Unix())
+			os.WriteFile(backupPath, data, info.Mode())
 		}
 	}
 

@@ -140,5 +140,31 @@ func getServiceStatuses() ([]ServiceStatus, error) {
 		})
 	}
 
+	// --- Dynamic Failure Auto-Discovery (Windows Zero-Config) ---
+	// Find any service configured to start automatically but is currently stopped/crashed.
+	cmdStr := `Get-CimInstance Win32_Service | Where-Object { $_.StartMode -eq 'Auto' -and $_.State -ne 'Running' -and $_.Name -notmatch 'SysmonLog|gupdate' } | Select-Object -ExpandProperty Name`
+	failedOut, err := exec.Command("powershell", "-NoProfile", "-Command", cmdStr).Output()
+	if err == nil && len(failedOut) > 0 {
+		lines := strings.Split(strings.TrimSpace(string(failedOut)), "\n")
+		for _, line := range lines {
+			failedSrv := strings.TrimSpace(line)
+			if failedSrv != "" {
+				alreadyAdded := false
+				for _, s := range statuses {
+					if s.Name == failedSrv {
+						alreadyAdded = true
+						break
+					}
+				}
+				if !alreadyAdded {
+					statuses = append(statuses, ServiceStatus{
+						Name:   failedSrv,
+						Status: "failed", // We map "Stopped but should be Auto" to "failed" for the alert engine
+					})
+				}
+			}
+		}
+	}
+
 	return statuses, nil
 }

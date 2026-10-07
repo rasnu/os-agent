@@ -55,11 +55,13 @@ func (a *WindowsAdapter) GetMetrics() (Metrics, []error) {
 		metrics.SwapUsage = val
 	}
 
-	if val, err := getLoadAvg(); err != nil {
+	if l_str, l_5, err := getLoadAvg(); err != nil {
 		errs = append(errs, fmt.Errorf("load: %w", err))
 	} else {
-		metrics.LoadAvg = val
+		metrics.LoadAvg = l_str
+		metrics.Load5 = l_5
 	}
+	metrics.CPUCores, _ = cpu.Counts(true)
 
 	if rx, tx, err := getNetworkIO(); err != nil {
 		errs = append(errs, fmt.Errorf("network: %w", err))
@@ -87,7 +89,25 @@ func (a *WindowsAdapter) GetMetrics() (Metrics, []error) {
 		metrics.Services = services
 	}
 
+	metrics.OOMKills = getOOMKills()
+
 	return metrics, errs
+}
+
+func getOOMKills() []string {
+	var ooms []string
+	// Windows logs Resource Exhaustion (OOM) as Event ID 2004 in the System log
+	cmdStr := `Get-EventLog -LogName System -Source "Microsoft-Windows-Resource-Exhaustion-Detector" -Newest 5 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Message`
+	out, err := exec.Command("powershell", "-NoProfile", "-Command", cmdStr).Output()
+	if err == nil && len(out) > 0 {
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		for _, line := range lines {
+			if strings.TrimSpace(line) != "" {
+				ooms = append(ooms, strings.TrimSpace(line))
+			}
+		}
+	}
+	return ooms
 }
 
 func (a *WindowsAdapter) GetShellCmd(ctx context.Context, script string, runAsUser string) *exec.Cmd {
@@ -254,13 +274,13 @@ func getSwapUsage() (float64, error) {
 	return s.UsedPercent, nil
 }
 
-func getLoadAvg() (string, error) {
+func getLoadAvg() (string, float64, error) {
 	l, err := load.Avg()
 	if err != nil {
 		// Windows load avg via gopsutil might sometimes be unimplemented or empty.
-		return "0.0, 0.0, 0.0", nil
+		return "0.0, 0.0, 0.0", 0.0, nil
 	}
-	return fmt.Sprintf("%.2f, %.2f, %.2f", l.Load1, l.Load5, l.Load15), nil
+	return fmt.Sprintf("%.2f, %.2f, %.2f", l.Load1, l.Load5, l.Load15), l.Load5, nil
 }
 
 func getNetworkIO() (uint64, uint64, error) {
