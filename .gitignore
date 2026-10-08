@@ -43,3 +43,81 @@ audit.jsonl
 
 # All compiled release binaries go here; never commit them
 /build/
+/dist/
+/dist-test/
+
+# -----------------------------------------------------------------------------
+# Test artifacts
+# -----------------------------------------------------------------------------
+
+# Binaries produced by `go test -c`
+*.test
+
+# osadapter cross-compilation test binaries (old and new package name)
+os_adapter.test*
+osadapter.test*
+
+# Coverage reports
+coverage.out
+coverage.html
+
+# Raw test output captured to files during development
+test_out.txt
+test_out2.txt
+*.test_out.txt
+
+# -----------------------------------------------------------------------------
+# Logs
+# -----------------------------------------------------------------------------
+
+# Agent log file written at runtime
+*.log
+
+# -----------------------------------------------------------------------------
+# Credentials and environment files
+# Never commit tokens, bearer credentials, or environment secrets
+# -----------------------------------------------------------------------------
+
+*.env
+agent.env
+.env.local
+.env.*.local
+.agent_update_keys/
+*.key
+*.pem
+
+# -----------------------------------------------------------------------------
+# Go toolchain
+# -----------------------------------------------------------------------------
+
+# Go workspace files (local multi-module dev only)
+go.work
+go.work.sum
+
+# Vendor directory (uncomment if you ever vendor dependencies)
+# vendor/
+
+# -----------------------------------------------------------------------------
+# Editor and OS noise
+# -----------------------------------------------------------------------------
+
+# JetBrains IDEs (GoLand, IntelliJ)
+.idea/
+
+# VS Code
+.vscode/
+
+# macOS Finder metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Vim swap files
+*.swp
+*.swo
+*~
+
+# Windows thumbnail cache
+Thumbs.db
+ehthumbs.db
+Desktop.ini

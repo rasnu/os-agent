@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# RasnuOS Agent pre-commit hook.
+# Enable once per clone:   git config core.hooksPath .githooks
+# Bypass in an emergency:  git commit --no-verify
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+STAGED_GO=$(git diff --cached --name-only --diff-filter=ACM -- '*.go' || true)
+
+# 1. Block binaries, key material and runtime logs from being committed.
+BLOCKED=$(git diff --cached --name-only --diff-filter=ACM | grep -E \
+  '(\.key$|\.pem$|^\.agent_update_keys/|(^|/)audit\.jsonl$|\.exe$|^dist/|^build/)' || true)
+if [ -n "$BLOCKED" ]; then
+  echo "✗ pre-commit: refusing to commit key material, binaries or runtime logs:"
+  echo "$BLOCKED" | sed 's/^/    /'
+  exit 1
+fi
+
+# Any staged file larger than 5 MB is almost certainly a compiled binary.
+while IFS= read -r f; do
+  [ -f "$f" ] || continue
+  size=$(wc -c < "$f")
+  if [ "$size" -gt 5242880 ]; then
+    echo "✗ pre-commit: $f is $((size / 1048576)) MB — binaries belong on GitHub Releases, not in git."
+    exit 1
+  fi
+done < <(git diff --cached --name-only --diff-filter=ACM)
+
+# 2. Naive secret patterns in the staged diff (CI runs full gitleaks on every push).
+if git diff --cached -U0 | grep -E '^\+' | grep -Eiq \
+  '(AGENT_PRIVATE_KEY\s*[=:]\s*["'\'']?[A-Za-z0-9+/]{40,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{36}|AKIA[0-9A-Z]{16})'; then
+  echo "✗ pre-commit: the staged diff appears to contain a secret (private key / token)."
+  exit 1
+fi
+
+# 3. Go formatting and vet (only when Go files are staged).
+if [ -n "$STAGED_GO" ]; then
+  UNFORMATTED=$(gofmt -l $STAGED_GO)
+  if [ -n "$UNFORMATTED" ]; then
+    echo "✗ pre-commit: run 'gofmt -w .' — unformatted files:"
+    echo "$UNFORMATTED" | sed 's/^/    /'
+    exit 1
+  fi
+
+  if ! go vet ./... ; then
+    echo "✗ pre-commit: go vet failed."
+    exit 1
+  fi
+
+  # Fast test pass (no race detector; CI runs the full race suite).
+  if ! go test -count=1 ./... > /tmp/rasnuos-precommit-test.log 2>&1; then
+    echo "✗ pre-commit: tests failed — see /tmp/rasnuos-precommit-test.log"
+    grep -E -- '--- FAIL|FAIL' /tmp/rasnuos-precommit-test.log | head -20
+    exit 1
+  fi
+fi
+
+echo "✓ pre-commit checks passed"
