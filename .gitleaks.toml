@@ -1,0 +1,10 @@
+title = "RasnuOS Agent Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow dummy tokens/keys inside Go test files"
+paths = [
+    '''_test\.go$''',
+]
