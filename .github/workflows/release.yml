@@ -1,0 +1,115 @@
+# Copyright © 2026 Rasnu LLC (rasnu.com). All rights reserved.
+# Licensed under the Functional Source License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2).
+
+name: Agent Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.0.1)'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || github.event.inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, Sign and Release Agent
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Determine Version
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RAW_VER="${{ github.event.inputs.version }}"
+            VERSION="${RAW_VER#v}"
+            TAG_NAME="v${VERSION}"
+          else
+            TAG_NAME="${{ github.event.release.tag_name }}"
+            VERSION="${TAG_NAME#v}"
+          fi
+
+          if ! echo "${VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'${VERSION}' is not a valid semantic version (expected e.g. 1.0.1 or tag v1.0.1)."
+            exit 1
+          fi
+
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "TAG_NAME=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "Building agent version: ${VERSION} for tag: ${TAG_NAME}"
+
+      - name: Run Test Suite with Race Detector
+        run: go test -race -count=1 ./...
+
+      - name: Compile and Sign Binaries
+        env:
+          VERSION: ${{ steps.vars.outputs.VERSION }}
+          RELEASE: "1"
+          ENV: "production"
+          AGENT_PUBLIC_KEY: ${{ secrets.AGENT_PUBLIC_KEY }}
+          AGENT_PRIVATE_KEY: ${{ secrets.AGENT_PRIVATE_KEY }}
+          OUTPUT_DIR: "./dist"
+        run: |
+          mkdir -p ./dist
+          chmod +x ./scripts/build-all.sh
+          ./scripts/build-all.sh
+
+      - name: Verify Release Artifacts
+        env:
+          VERSION: ${{ steps.vars.outputs.VERSION }}
+        run: |
+          set -e
+          EXPECTED="linux-amd64 linux-arm64 macos-amd64 macos-arm64 windows-amd64.exe windows-arm64.exe"
+          for target in $EXPECTED; do
+            BIN="./dist/rasnuos-agent-${target}"
+            [ -f "${BIN}" ]     || { echo "::error::Missing binary ${BIN}"; exit 1; }
+            [ -f "${BIN}.sig" ] || { echo "::error::Missing signature ${BIN}.sig"; exit 1; }
+          done
+
+          chmod +x ./dist/rasnuos-agent-linux-amd64
+          GOT_VERSION=$(./dist/rasnuos-agent-linux-amd64 --version)
+          echo "Embedded version: ${GOT_VERSION}"
+          echo "${GOT_VERSION}" | grep -q "${VERSION}" || { echo "::error::Binary reports '${GOT_VERSION}', expected ${VERSION}"; exit 1; }
+
+          KEY_INFO=$(./dist/rasnuos-agent-linux-amd64 --key-info)
+          echo "${KEY_INFO}"
+          echo "${KEY_INFO}" | grep -q "Update Public Key: configured" || { echo "::error::Binary has no update public key embedded"; exit 1; }
+
+      - name: Generate Checksum Digest
+        run: |
+          cd ./dist
+          sha256sum $(ls rasnuos-agent-* | grep -vE '\.(sig|sha256)$') > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload Binaries to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.TAG_NAME }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            dist/rasnuos-agent-*
+            dist/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
