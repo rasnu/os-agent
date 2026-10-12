@@ -19,7 +19,7 @@ require (
 )
 
 require (
-	github.com/creack/pty v1.1.21
+	github.com/creack/pty v1.1.24
 	github.com/hashicorp/yamux v0.1.2
 	github.com/nxadm/tail v1.4.11
 	github.com/pmezard/go-difflib v1.0.0
