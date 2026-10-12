@@ -16,7 +16,7 @@ func TestProxyConn(t *testing.T) {
 	go proxyConn(server1, server2)
 
 	// We are now connected via client1 and client2 through the proxy
-	
+
 	// Test sending from client1 to client2
 	msg1 := []byte("Hello from client1")
 	go func() {
@@ -47,13 +47,13 @@ func TestProxyConn(t *testing.T) {
 	if !bytes.Equal(buf[:n], msg2) {
 		t.Errorf("Expected %s, got %s", msg2, buf[:n])
 	}
-	
+
 	// Test that closing one closes the other (via proxyConn defer Close)
 	client1.Close()
-	
+
 	// Wait a moment for proxyConn to detect close and close server2
 	time.Sleep(50 * time.Millisecond)
-	
+
 	// Writing to client2 should now fail because the proxy closed server2
 	_, err = client2.Write([]byte("test"))
 	if err == nil {

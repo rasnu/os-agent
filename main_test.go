@@ -17,7 +17,7 @@ func TestMain_VersionFlag(t *testing.T) {
 	os.Stdout = w
 
 	err := run([]string{"--version"})
-	
+
 	w.Close()
 	os.Stdout = oldStdout
 
@@ -38,12 +38,12 @@ func TestMain_MissingFlags(t *testing.T) {
 	// Temporarily clear env vars to ensure we fall back to flags
 	os.Unsetenv("BEARER_TOKEN")
 	os.Unsetenv("SERVER_ID")
-	
+
 	err := run([]string{})
 	if err == nil {
 		t.Fatalf("Expected error for missing token/server-id, got nil")
 	}
-	
+
 	if !strings.Contains(err.Error(), "are required") {
 		t.Errorf("Expected 'are required' error, got %v", err)
 	}
@@ -127,4 +127,3 @@ func TestMain_KeyInfoFlag(t *testing.T) {
 		t.Errorf("Expected 'configured' and key in output, got: %s", buf2.String())
 	}
 }
-

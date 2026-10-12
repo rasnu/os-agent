@@ -39,7 +39,14 @@ When the agent starts, it does three things concurrently:
 2. **Starts a metrics engine** that collects CPU, RAM, disk, swap, network I/O, running processes, and service states every 15 seconds, then ships that data to the dashboard.
 3. **Starts an idle terminal session cleaner** that closes any PTY session that has been inactive for more than 30 minutes.
 
-The agent never opens any listening port for incoming connections. All communication is agent-initiated and outbound-only. When the dashboard wants your server to do something, it pushes an event over the existing WebSocket connection that the agent already has open.
+The agent never opens a port that is reachable from the network. All control-plane communication is agent-initiated and outbound-only. When the dashboard wants your server to do something, it pushes an event over the existing WebSocket connection that the agent already has open.
+
+The only listener is an optional local observability endpoint (`/healthz` and `/metrics`, Prometheus format) bound to **`127.0.0.1:9090`** by default, so it can only be reached from the server itself. Configure it with:
+
+| Variable | Default | Effect |
+|---|---|---|
+| `METRICS_PORT` | `9090` | Port for the local endpoint. Set to `off` to disable it entirely. |
+| `METRICS_BIND` | `127.0.0.1` | Bind address. Only change this (e.g. to a private interface IP) if you scrape from another host, and firewall it. |
 
 On shutdown (SIGTERM or Ctrl+C), the agent stops accepting new commands, waits for all in-progress commands to finish, then exits cleanly.
 

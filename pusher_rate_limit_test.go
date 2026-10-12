@@ -36,8 +36,9 @@ func TestPusherRateLimit_DefaultConfig(t *testing.T) {
 func TestPusherRateLimit_EventThrottling(t *testing.T) {
 	// Isolate audit log
 	tmpDir := t.TempDir()
+	prevAuditOverride := auditFilePathOverride
 	auditFilePathOverride = tmpDir + "/test_audit.jsonl"
-	defer func() { auditFilePathOverride = "" }()
+	defer func() { auditFilePathOverride = prevAuditOverride }()
 
 	var mu sync.Mutex
 	completions := make([]map[string]interface{}, 0)
@@ -118,7 +119,6 @@ func TestPusherRateLimit_EventThrottling(t *testing.T) {
 
 	client.CancelAllCommands()
 	client.WaitCommands()
-
 
 	// Verify completions
 	mu.Lock()

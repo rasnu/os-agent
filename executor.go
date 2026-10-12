@@ -435,9 +435,6 @@ func (c *PusherClient) sendCompletion(pipelineId string, stepId string, success 
 	log.Printf("All %d completion attempts failed for step %s. Step may be orphaned — backend sweeper will recover it.", maxAttempts, stepId)
 }
 
-
-
-
 func (c *PusherClient) executeDiscovery(script string) {
 
 	log.Printf("Executing Discovery Script")
@@ -452,17 +449,17 @@ func (c *PusherClient) executeDiscovery(script string) {
 	if err != nil {
 		log.Printf("Discovery execution finished with error: %v", err)
 		logAuditEvent(AuditEvent{
-			Action:     "execute_discovery",
-			Command:    "INTERNAL_DISCOVERY_SCRIPT",
-			Success:    false,
-			Error:      err.Error(),
+			Action:  "execute_discovery",
+			Command: "INTERNAL_DISCOVERY_SCRIPT",
+			Success: false,
+			Error:   err.Error(),
 		})
 	} else {
 		log.Printf("Discovery execution finished successfully.")
 		logAuditEvent(AuditEvent{
-			Action:     "execute_discovery",
-			Command:    "INTERNAL_DISCOVERY_SCRIPT",
-			Success:    true,
+			Action:  "execute_discovery",
+			Command: "INTERNAL_DISCOVERY_SCRIPT",
+			Success: true,
 		})
 	}
 
@@ -512,12 +509,12 @@ func (c *PusherClient) executeRawCommand(requestId, cmdStr, runAsUser string) {
 	if blocked, pattern := isCommandDestructive(cmdStr); blocked {
 		errMsg := fmt.Sprintf("\n[GUARDRAIL BLOCK] Destructive command matched pattern '%s' and is prohibited in Strict Mode.\n", pattern)
 		logAuditEvent(AuditEvent{
-			Action:     "execute_raw_command",
-			StepID:     requestId,
-			Command:    redactSecrets(cmdStr),
-			RunAsUser:  runAsUser,
-			Success:    false,
-			Error:      errMsg,
+			Action:    "execute_raw_command",
+			StepID:    requestId,
+			Command:   redactSecrets(cmdStr),
+			RunAsUser: runAsUser,
+			Success:   false,
+			Error:     errMsg,
 		})
 		c.sendCompletion("sync", requestId, false, errMsg)
 		return
@@ -534,20 +531,20 @@ func (c *PusherClient) executeRawCommand(requestId, cmdStr, runAsUser string) {
 	if err != nil {
 		logMsg = fmt.Sprintf("Command failed: %v\nOutput: %s", err, string(output))
 		logAuditEvent(AuditEvent{
-			Action:     "execute_raw_command",
-			StepID:     requestId,
-			Command:    redactSecrets(cmdStr),
-			RunAsUser:  runAsUser,
-			Success:    false,
-			Error:      err.Error(),
+			Action:    "execute_raw_command",
+			StepID:    requestId,
+			Command:   redactSecrets(cmdStr),
+			RunAsUser: runAsUser,
+			Success:   false,
+			Error:     err.Error(),
 		})
 	} else {
 		logAuditEvent(AuditEvent{
-			Action:     "execute_raw_command",
-			StepID:     requestId,
-			Command:    redactSecrets(cmdStr),
-			RunAsUser:  runAsUser,
-			Success:    true,
+			Action:    "execute_raw_command",
+			StepID:    requestId,
+			Command:   redactSecrets(cmdStr),
+			RunAsUser: runAsUser,
+			Success:   true,
 		})
 	}
 
@@ -560,42 +557,42 @@ func (c *PusherClient) executeComputerIntent(pipelineId, stepId, commandStr stri
 		c.sendCompletion(pipelineId, stepId, false, "Invalid computer intent prefix")
 		return
 	}
-	
+
 	jsonStr := strings.TrimPrefix(commandStr, prefix)
-	
+
 	var payload struct {
 		Action     string `json:"action"`
 		Coordinate []int  `json:"coordinate"`
 		Text       string `json:"text"`
 	}
-	
+
 	if err := json.Unmarshal([]byte(jsonStr), &payload); err != nil {
 		c.sendCompletion(pipelineId, stepId, false, "Invalid computer intent json: "+err.Error())
 		return
 	}
-	
+
 	x, y := 0, 0
 	if len(payload.Coordinate) >= 2 {
 		x = payload.Coordinate[0]
 		y = payload.Coordinate[1]
 	}
-	
+
 	logBuf := &LogBuffer{}
 	c.streamLogWS(pipelineId, stepId, fmt.Sprintf("Executing GUI action: %s\n", payload.Action), logBuf)
-	
+
 	data, err := os_adapter.Current().ExecuteComputerAction(payload.Action, payload.Text, x, y)
-	
+
 	if err != nil {
 		c.streamLogWS(pipelineId, stepId, fmt.Sprintf("GUI action failed: %v\n", err), logBuf)
 		c.sendCompletion(pipelineId, stepId, false, logBuf.String())
 		return
 	}
-	
+
 	// If it's a screenshot, encode it in Base64 and wrap it in our tags so the backend parses it as a Vision image!
 	if payload.Action == "screenshot" && len(data) > 0 {
 		b64 := base64.StdEncoding.EncodeToString(data)
 		wrappedPayload := fmt.Sprintf("\n[SCREENSHOT_BASE64_START]%s[SCREENSHOT_BASE64_END]\n", b64)
-		
+
 		// CRITICAL: Chunk the massive base64 payload into 8KB segments.
 		// Sending a 2MB string in a single WebSocket frame will crash Pusher/Reverb!
 		chunkSize := 8000
@@ -611,7 +608,7 @@ func (c *PusherClient) executeComputerIntent(pipelineId, stepId, commandStr stri
 	} else if len(data) > 0 {
 		c.streamLogWS(pipelineId, stepId, string(data)+"\n", logBuf)
 	}
-	
+
 	c.streamLogWS(pipelineId, stepId, "\nComputer action executed successfully.\n", logBuf)
 	c.sendCompletion(pipelineId, stepId, true, logBuf.String())
 }

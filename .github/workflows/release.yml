@@ -1,20 +1,24 @@
 name: Agent Release
 
+# How to release:
+#   • GitHub UI → Releases → "Draft a new release" → tag e.g. v1.0.1 → Publish.
+#     This workflow then builds, signs and attaches all 6 binaries to that release.
+#   • Or: Actions → "Agent Release" → Run workflow → enter a version (creates the release).
 on:
   release:
     types: [published]
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. 1.0.0)'
-        required: false
-        default: '1.0.0'
+        description: 'Release version (e.g. 1.0.1)'
+        required: true
 
 permissions:
   contents: write
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || github.event.inputs.version }}
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -41,19 +45,22 @@ jobs:
             RAW_VER="${{ github.event.inputs.version }}"
             VERSION="${RAW_VER#v}"
             TAG_NAME="v${VERSION}"
-          elif [ "${{ github.event_name }}" = "release" ]; then
+          else
             TAG_NAME="${{ github.event.release.tag_name }}"
             VERSION="${TAG_NAME#v}"
-          else
-            TAG_NAME="${GITHUB_REF#refs/tags/}"
-            VERSION="${TAG_NAME#v}"
           fi
-          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
-          echo "TAG_NAME=${TAG_NAME}" >> $GITHUB_OUTPUT
+
+          if ! echo "${VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'${VERSION}' is not a valid semantic version (expected e.g. 1.0.1 or tag v1.0.1)."
+            exit 1
+          fi
+
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "TAG_NAME=${TAG_NAME}" >> "$GITHUB_OUTPUT"
           echo "Building agent version: ${VERSION} for tag: ${TAG_NAME}"
 
       - name: Run Test Suite with Race Detector
-        run: go test -v -race ./...
+        run: go test -race -count=1 ./...
 
       - name: Compile and Sign Binaries
         env:
@@ -68,10 +75,32 @@ jobs:
           chmod +x ./build-all.sh
           ./build-all.sh
 
+      - name: Verify Release Artifacts
+        env:
+          VERSION: ${{ steps.vars.outputs.VERSION }}
+        run: |
+          set -e
+          EXPECTED="linux-amd64 linux-arm64 macos-amd64 macos-arm64 windows-amd64.exe windows-arm64.exe"
+          for target in $EXPECTED; do
+            BIN="./dist/rasnuos-agent-${target}"
+            [ -f "${BIN}" ]     || { echo "::error::Missing binary ${BIN}"; exit 1; }
+            [ -f "${BIN}.sig" ] || { echo "::error::Missing signature ${BIN}.sig"; exit 1; }
+          done
+
+          chmod +x ./dist/rasnuos-agent-linux-amd64
+          GOT_VERSION=$(./dist/rasnuos-agent-linux-amd64 --version)
+          echo "Embedded version: ${GOT_VERSION}"
+          echo "${GOT_VERSION}" | grep -q "${VERSION}" || { echo "::error::Binary reports '${GOT_VERSION}', expected ${VERSION}"; exit 1; }
+
+          KEY_INFO=$(./dist/rasnuos-agent-linux-amd64 --key-info)
+          echo "${KEY_INFO}"
+          echo "${KEY_INFO}" | grep -q "Update Public Key: configured" || { echo "::error::Binary has no update public key embedded"; exit 1; }
+
       - name: Generate Checksum Digest
         run: |
           cd ./dist
-          sha256sum * > SHA256SUMS.txt 2>/dev/null || true
+          sha256sum $(ls rasnuos-agent-* | grep -vE '\.(sig|sha256)$') > SHA256SUMS.txt
+          cat SHA256SUMS.txt
 
       - name: Upload Binaries to GitHub Release
         uses: softprops/action-gh-release@v2

@@ -95,7 +95,9 @@ func (c *PusherClient) handleMigrationCommand(action string, args map[string]int
 	case "prepare-p2p-receiver":
 		portF, ok := args["port"].(float64)
 		port := 0
-		if ok { port = int(portF) }
+		if ok {
+			port = int(portF)
+		}
 		receiveCmd := getString(args, "receive_command")
 		c.prepareP2pReceiver(pipelineId, stepId, receiveCmd, token, port)
 		logAuditEvent(AuditEvent{Action: "prepare_p2p_receiver", PipelineID: pipelineId, StepID: stepId, Command: redactSecrets(receiveCmd), Success: true})
@@ -103,7 +105,9 @@ func (c *PusherClient) handleMigrationCommand(action string, args map[string]int
 		host := getString(args, "host")
 		portF, ok := args["port"].(float64)
 		port := 0
-		if ok { port = int(portF) }
+		if ok {
+			port = int(portF)
+		}
 		fingerprint := getString(args, "fingerprint")
 		sendCmd := getString(args, "send_command")
 		c.runP2pSender(pipelineId, stepId, sendCmd, host, port, fingerprint, token)
@@ -536,7 +540,7 @@ func (c *PusherClient) prepareP2pReceiver(pipelineId, stepId, receiveCmd, token 
 		// Pipe the network connection directly into cmd.Stdin
 		cmd.Stdin = conn
 		cmd.Stdout = conn
-		
+
 		// 2. Enterprise Observability: Pipe Receiver's Stderr back to WS safely using StreamBatcher
 		stderrPipe, err := cmd.StderrPipe()
 		if err == nil {
@@ -637,7 +641,7 @@ func (c *PusherClient) runP2pSender(pipelineId, stepId, sendCmd, host string, po
 	// Use the OS-appropriate shell (PowerShell on Windows, bash on Linux/macOS).
 	// Uses execCommand so that it can be mocked in tests.
 	cmd := platformShellCmd(sendCmd)
-	
+
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
 		c.sendMigrationCompletion(pipelineId, stepId, false, fmt.Sprintf("Failed to get stdout pipe: %v", err), nil)
@@ -645,7 +649,7 @@ func (c *PusherClient) runP2pSender(pipelineId, stepId, sendCmd, host string, po
 	}
 
 	stderrPipe, _ := cmd.StderrPipe()
-	
+
 	batcher := NewStreamBatcher(c, pipelineId, stepId, nil)
 	var streamWg sync.WaitGroup
 

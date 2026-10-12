@@ -32,11 +32,11 @@ func TestAlertMonitor_CPUSpike(t *testing.T) {
 	// Reset global state
 	globalAlertMonitor = &AlertMonitor{
 		thresholds: AlertThresholds{
-			CPU:           95.0,
-			RAM:           95.0,
-			Disk:          90.0,
-			Swap:          80.0,
-			IOWait:        50.0,
+			CPU:            95.0,
+			RAM:            95.0,
+			Disk:           90.0,
+			Swap:           80.0,
+			IOWait:         50.0,
 			LoadMultiplier: 2.0,
 		},
 	}
@@ -92,11 +92,11 @@ func TestAlertMonitor_CPUSpike(t *testing.T) {
 func TestAlertMonitor_RAMSpike(t *testing.T) {
 	globalAlertMonitor = &AlertMonitor{
 		thresholds: AlertThresholds{
-			CPU:           95.0,
-			RAM:           95.0,
-			Disk:          90.0,
-			Swap:          80.0,
-			IOWait:        50.0,
+			CPU:            95.0,
+			RAM:            95.0,
+			Disk:           90.0,
+			Swap:           80.0,
+			IOWait:         50.0,
 			LoadMultiplier: 2.0,
 		},
 	}
@@ -132,11 +132,11 @@ func TestAlertMonitor_RAMSpike(t *testing.T) {
 func TestAlertMonitor_Cooldown(t *testing.T) {
 	globalAlertMonitor = &AlertMonitor{
 		thresholds: AlertThresholds{
-			CPU:           95.0,
-			RAM:           95.0,
-			Disk:          90.0,
-			Swap:          80.0,
-			IOWait:        50.0,
+			CPU:            95.0,
+			RAM:            95.0,
+			Disk:           90.0,
+			Swap:           80.0,
+			IOWait:         50.0,
 			LoadMultiplier: 2.0,
 		},
 	}
@@ -179,11 +179,11 @@ func TestAlertMonitor_Cooldown(t *testing.T) {
 func TestAlertMonitor_StateReset(t *testing.T) {
 	globalAlertMonitor = &AlertMonitor{
 		thresholds: AlertThresholds{
-			CPU:           95.0,
-			RAM:           95.0,
-			Disk:          90.0,
-			Swap:          80.0,
-			IOWait:        50.0,
+			CPU:            95.0,
+			RAM:            95.0,
+			Disk:           90.0,
+			Swap:           80.0,
+			IOWait:         50.0,
 			LoadMultiplier: 2.0,
 		},
 	}
@@ -215,11 +215,11 @@ func TestAlertMonitor_StateReset(t *testing.T) {
 func TestAlertMonitor_SimultaneousSpike(t *testing.T) {
 	globalAlertMonitor = &AlertMonitor{
 		thresholds: AlertThresholds{
-			CPU:           95.0,
-			RAM:           95.0,
-			Disk:          90.0,
-			Swap:          80.0,
-			IOWait:        50.0,
+			CPU:            95.0,
+			RAM:            95.0,
+			Disk:           90.0,
+			Swap:           80.0,
+			IOWait:         50.0,
 			LoadMultiplier: 2.0,
 		},
 	}
@@ -257,11 +257,11 @@ func TestAlertMonitor_SimultaneousSpike(t *testing.T) {
 func TestAlertMonitor_DiskFull(t *testing.T) {
 	globalAlertMonitor = &AlertMonitor{
 		thresholds: AlertThresholds{
-			CPU:           95.0,
-			RAM:           95.0,
-			Disk:          90.0,
-			Swap:          80.0,
-			IOWait:        50.0,
+			CPU:            95.0,
+			RAM:            95.0,
+			Disk:           90.0,
+			Swap:           80.0,
+			IOWait:         50.0,
 			LoadMultiplier: 2.0,
 		},
 	}
@@ -300,11 +300,11 @@ func TestAlertMonitor_DiskFull(t *testing.T) {
 func TestAlertMonitor_ServiceCrash(t *testing.T) {
 	globalAlertMonitor = &AlertMonitor{
 		thresholds: AlertThresholds{
-			CPU:           95.0,
-			RAM:           95.0,
-			Disk:          90.0,
-			Swap:          80.0,
-			IOWait:        50.0,
+			CPU:            95.0,
+			RAM:            95.0,
+			Disk:           90.0,
+			Swap:           80.0,
+			IOWait:         50.0,
 			LoadMultiplier: 2.0,
 		},
 	}
@@ -350,11 +350,11 @@ func TestAlertMonitor_ServiceCrash(t *testing.T) {
 func TestAlertMonitor_OOMKill(t *testing.T) {
 	globalAlertMonitor = &AlertMonitor{
 		thresholds: AlertThresholds{
-			CPU:           95.0,
-			RAM:           95.0,
-			Disk:          90.0,
-			Swap:          80.0,
-			IOWait:        50.0,
+			CPU:            95.0,
+			RAM:            95.0,
+			Disk:           90.0,
+			Swap:           80.0,
+			IOWait:         50.0,
 			LoadMultiplier: 2.0,
 		},
 	}
@@ -413,11 +413,11 @@ func TestAlertMonitor_OOMKill(t *testing.T) {
 func TestAlertMonitor_SwapPressure(t *testing.T) {
 	globalAlertMonitor = &AlertMonitor{
 		thresholds: AlertThresholds{
-			CPU:           95.0,
-			RAM:           95.0,
-			Disk:          90.0,
-			Swap:          80.0,
-			IOWait:        50.0,
+			CPU:            95.0,
+			RAM:            95.0,
+			Disk:           90.0,
+			Swap:           80.0,
+			IOWait:         50.0,
 			LoadMultiplier: 2.0,
 		},
 	}
@@ -452,11 +452,11 @@ func TestAlertMonitor_SwapPressure(t *testing.T) {
 func TestAlertMonitor_IOWait(t *testing.T) {
 	globalAlertMonitor = &AlertMonitor{
 		thresholds: AlertThresholds{
-			CPU:           95.0,
-			RAM:           95.0,
-			Disk:          90.0,
-			Swap:          80.0,
-			IOWait:        50.0,
+			CPU:            95.0,
+			RAM:            95.0,
+			Disk:           90.0,
+			Swap:           80.0,
+			IOWait:         50.0,
 			LoadMultiplier: 2.0,
 		},
 	}
@@ -491,11 +491,11 @@ func TestAlertMonitor_IOWait(t *testing.T) {
 func TestAlertMonitor_HighLoad(t *testing.T) {
 	globalAlertMonitor = &AlertMonitor{
 		thresholds: AlertThresholds{
-			CPU:           95.0,
-			RAM:           95.0,
-			Disk:          90.0,
-			Swap:          80.0,
-			IOWait:        50.0,
+			CPU:            95.0,
+			RAM:            95.0,
+			Disk:           90.0,
+			Swap:           80.0,
+			IOWait:         50.0,
 			LoadMultiplier: 2.0,
 		},
 	}

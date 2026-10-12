@@ -496,16 +496,24 @@ func (a *LinuxAdapter) ExecuteComputerAction(action, text string, x, y int) ([]b
 		}
 		return []byte(strings.Join(titles, "\n")), nil
 	case "activate_window":
-		if isWayland { return nil, fmt.Errorf("activate_window is blocked by Wayland security model") }
+		if isWayland {
+			return nil, fmt.Errorf("activate_window is blocked by Wayland security model")
+		}
 		return exec.Command("wmctrl", "-a", text).CombinedOutput()
 	case "close_window":
-		if isWayland { return nil, fmt.Errorf("close_window is blocked by Wayland security model") }
+		if isWayland {
+			return nil, fmt.Errorf("close_window is blocked by Wayland security model")
+		}
 		return exec.Command("wmctrl", "-c", text).CombinedOutput()
 	case "move_window":
-		if isWayland { return nil, fmt.Errorf("move_window is blocked by Wayland security model") }
+		if isWayland {
+			return nil, fmt.Errorf("move_window is blocked by Wayland security model")
+		}
 		return exec.Command("wmctrl", "-r", text, "-e", fmt.Sprintf("0,%d,%d,-1,-1", x, y)).CombinedOutput()
 	case "resize_window":
-		if isWayland { return nil, fmt.Errorf("resize_window is blocked by Wayland security model") }
+		if isWayland {
+			return nil, fmt.Errorf("resize_window is blocked by Wayland security model")
+		}
 		return exec.Command("wmctrl", "-r", text, "-e", fmt.Sprintf("0,-1,-1,%d,%d", x, y)).CombinedOutput()
 	case "mouse_move":
 		if isWayland {
@@ -541,7 +549,7 @@ func (a *LinuxAdapter) ExecuteComputerAction(action, text string, x, y int) ([]b
 	case "screenshot":
 		tmpFile := fmt.Sprintf("/tmp/rasnuos_screenshot_%d.png", time.Now().UnixNano())
 		defer os.Remove(tmpFile)
-		
+
 		if isWayland {
 			err := exec.Command("grim", tmpFile).Run()
 			if err != nil {
@@ -603,6 +611,6 @@ func (a *LinuxAdapter) setupDisplayEnvironment() bool {
 			}
 		}
 	}
-	
+
 	return false // X11
 }

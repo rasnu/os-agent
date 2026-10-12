@@ -106,6 +106,12 @@ if [ -n "${PRIV_KEY}" ]; then
     done
     echo ""
 else
+    if [ "${RELEASE}" = "1" ] || [ "${ENV}" = "production" ]; then
+        echo "❌ [SECURITY ERROR] Release build requires AGENT_PRIVATE_KEY to sign binaries."
+        echo "   Installed agents refuse unsigned self-updates, so an unsigned release would be"
+        echo "   impossible to roll out over the air. Add the AGENT_PRIVATE_KEY repository secret."
+        exit 1
+    fi
     echo "⚠️  Notice: Private key not found (AGENT_PRIVATE_KEY or ${KEY_DIR}/agent_ed25519_private.key)."
     echo "   Binaries compiled with embedded public key, but .sig signatures were skipped."
     echo ""

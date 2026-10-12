@@ -11,7 +11,7 @@ import (
 )
 
 func TestSecureTLSConfig(t *testing.T) {
-	
+
 	// Create a dummy certificate structure with dummy SPKI
 	dummySPKI := []byte("dummy_public_key_info")
 	cert := &x509.Certificate{
@@ -51,7 +51,7 @@ func TestSecureTLSConfig(t *testing.T) {
 			t.Errorf("Expected error for invalid pin, got nil")
 		}
 	})
-	
+
 	t.Run("Multiple pins including valid", func(t *testing.T) {
 		config := secureTLSConfig("invalid_hash," + hashHex)
 		err := config.VerifyConnection(cs)
@@ -80,16 +80,16 @@ func TestApplyTLSPinToDefaultTransport(t *testing.T) {
 	fileTransferHTTPClient = &http.Client{Timeout: 0, Transport: defaultTransport()}
 
 	applyTLSPinToDefaultTransport("dummy_pin")
-	
+
 	transport, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
 		t.Fatalf("http.DefaultTransport is not an *http.Transport")
 	}
-	
+
 	if transport.TLSClientConfig == nil {
 		t.Fatalf("TLSClientConfig was not set on http.DefaultTransport")
 	}
-	
+
 	if transport.TLSClientConfig.InsecureSkipVerify {
 		t.Errorf("InsecureSkipVerify should be false on http.DefaultTransport")
 	}

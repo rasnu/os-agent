@@ -7,10 +7,19 @@ on:
     branches: [ "main", "develop", "master" ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # ── 1. Format, vet and test ────────────────────────────────────────────────
   test:
-    name: Run Agent Test Suite
+    name: Lint & Test (race detector)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout Code
@@ -19,30 +28,129 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 'stable'
+          go-version: stable
           cache: true
           cache-dependency-path: go.sum
 
       - name: Verify Dependencies
         run: go mod verify
 
+      - name: Check go.mod / go.sum are tidy
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum || {
+            echo "::error::go.mod/go.sum are not tidy. Run 'go mod tidy' and commit."
+            exit 1
+          }
+
+      - name: Check formatting (gofmt)
+        run: |
+          UNFORMATTED=$(gofmt -l .)
+          if [ -n "$UNFORMATTED" ]; then
+            echo "::error::The following files are not gofmt-formatted (run 'gofmt -w .'):"
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+
       - name: Run Go Vet
         run: go vet ./...
 
-      - name: Run 292 Tests with Race Detector
+      - name: Run Tests with Race Detector
         run: |
           set -o pipefail
-          go test -v -race -cover ./... 2>&1 | tee test_run.log
+          go test -v -race -count=1 -coverprofile=coverage.out ./... 2>&1 | tee test_run.log
+
+      - name: Coverage Summary
+        if: success()
+        run: |
+          TOTAL=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}')
+          echo "Total coverage: ${TOTAL}"
+          echo "### Agent test coverage: ${TOTAL}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Summarize Test Failures
         if: failure()
         run: |
           echo "====================== TEST FAILURES ======================"
           grep -E "(--- FAIL|FAIL:|panic:|WARNING: DATA RACE)" test_run.log -A 10 -B 2 || true
-          echo "=========================================================="
+          echo "==========================================================="
+
+      - name: Ensure tests did not modify the working tree
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::The test suite left changes in the repository (tests must use temp dirs):"
+            git status --porcelain
+            exit 1
+          fi
+
+  # ── 2. Cross-platform build check (all 6 release targets) ─────────────────
+  build:
+    name: Cross-Platform Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: test
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+          cache-dependency-path: go.sum
 
       - name: Dry-Run Multi-Platform Compilation
         run: |
           chmod +x ./build-all.sh
-          OUTPUT_DIR="./dist-test" ./build-all.sh
-          rm -rf ./dist-test
+          OUTPUT_DIR="./dist-test" KEY_DIR="./.ci-keys" ./build-all.sh
+          rm -rf ./dist-test ./.ci-keys
+
+  # ── 3. Security: vulnerabilities, SAST, secrets ───────────────────────────
+  security:
+    name: Security Scans
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Code (full history for secret scanning)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+          cache-dependency-path: go.sum
+
+      # Known-vulnerability scan of the Go toolchain + dependencies, limited to
+      # code paths the agent actually calls. Fails the build on reachable vulns.
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+      # Static analysis (SAST). Report-only: an agent that executes shell commands
+      # and manages files by design triggers rules such as G204 (subprocess) and
+      # G304 (file path from variable). Findings are listed in the job summary.
+      - name: gosec (SAST, report-only)
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec -quiet -no-fail -fmt=text -exclude-dir=cmd/signer ./... | tee gosec.txt
+          {
+            echo "### gosec findings (report-only)"
+            echo '```'
+            grep -E "^\s*\[|Summary|Issues" gosec.txt | tail -40 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Secret scanning across the full git history. Uses the gitleaks CLI directly
+      # (the gitleaks GitHub Action requires a paid license for organisation repos).
+      - name: gitleaks (secret scanning)
+        run: |
+          GITLEAKS_VERSION=8.21.2
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          ./gitleaks detect --source . --redact --verbose --exit-code 1

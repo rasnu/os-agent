@@ -29,7 +29,6 @@ func secureTLSConfig(pins string) *tls.Config {
 					hash := sha256.Sum256(cert.RawSubjectPublicKeyInfo)
 					hashHex := hex.EncodeToString(hash[:])
 
-
 					for _, pin := range pinList {
 						// Support optional "sha256/" prefix
 						cleanPin := strings.TrimPrefix(pin, "sha256/")
@@ -56,4 +55,3 @@ func applyTLSPinToDefaultTransport(pins string) {
 	}
 	SetGlobalTLSConfig(cfg)
 }
-

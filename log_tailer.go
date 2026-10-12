@@ -40,7 +40,7 @@ var piiRegexes = []*regexp.Regexp{
 var sigRegexes = []*regexp.Regexp{
 	regexp.MustCompile(`\b\d+\b`), // numbers
 	regexp.MustCompile(`[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}`), // UUIDs
-	regexp.MustCompile(`\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b`), // IPv4
+	regexp.MustCompile(`\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b`),                                           // IPv4
 }
 
 // Timestamp/log prefix detection for multiline (Starts with bracket, number, or standard month)
@@ -96,15 +96,15 @@ type LogAnomaly struct {
 }
 
 type LogTailer struct {
-	ApiURL       string
-	Token        string
-	ServerID     string
-	ActiveTails  map[string]*tail.Tail
-	ActiveMutex  sync.Mutex
-	stopChan     chan struct{}
+	ApiURL      string
+	Token       string
+	ServerID    string
+	ActiveTails map[string]*tail.Tail
+	ActiveMutex sync.Mutex
+	stopChan    chan struct{}
 
-	batchMutex   sync.Mutex
-	batchMap     map[string]*LogAnomaly // signature -> anomaly
+	batchMutex sync.Mutex
+	batchMap   map[string]*LogAnomaly // signature -> anomaly
 }
 
 func NewLogTailer(apiURL, token, serverID string) *LogTailer {
@@ -139,7 +139,7 @@ func (lt *LogTailer) flushBatch() {
 		lt.batchMutex.Unlock()
 		return
 	}
-	
+
 	payload := make([]*LogAnomaly, 0, len(lt.batchMap))
 	for _, a := range lt.batchMap {
 		payload = append(payload, a)
@@ -151,7 +151,7 @@ func (lt *LogTailer) flushBatch() {
 	reqBody, _ := json.Marshal(map[string]interface{}{
 		"anomalies": payload,
 	})
-	
+
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
 	if err != nil {
 		log.Printf("LogTailer: Error creating request: %v", err)
@@ -211,7 +211,7 @@ func (lt *LogTailer) UpdateMonitoredLogs(logs []string) {
 				ReOpen:    true,
 				MustExist: false,
 				Location:  &tail.SeekInfo{Offset: 0, Whence: 2}, // Tail from end
-				Poll:      true, // Cross-platform fallback for FS notify
+				Poll:      true,                                 // Cross-platform fallback for FS notify
 			})
 			if err != nil {
 				log.Printf("LogTailer: Failed to tail %s: %v", path, err)
@@ -225,7 +225,7 @@ func (lt *LogTailer) UpdateMonitoredLogs(logs []string) {
 
 func (lt *LogTailer) processTail(path string, t *tail.Tail) {
 	buffer := NewRingBuffer(LogContextSize)
-	
+
 	var currentEvent strings.Builder
 	var lastLine string
 
@@ -234,7 +234,7 @@ func (lt *LogTailer) processTail(path string, t *tail.Tail) {
 		if eventText == "" {
 			return
 		}
-		
+
 		// Add to context buffer
 		buffer.Add(eventText)
 
@@ -251,7 +251,7 @@ func (lt *LogTailer) processTail(path string, t *tail.Tail) {
 		if suspicious {
 			lt.queueAnomaly(path, eventText, buffer.GetAll())
 		}
-		
+
 		currentEvent.Reset()
 	}
 
@@ -264,7 +264,7 @@ func (lt *LogTailer) processTail(path string, t *tail.Tail) {
 		text := line.Text
 		// Windows logs use \r\n, nxadm/tail preserves \r on Windows sometimes.
 		text = strings.TrimRight(text, "\r")
-		
+
 		// Multiline logic: if it starts with space/tab or doesn't match standard log prefix, it's a continuation
 		if strings.HasPrefix(text, " ") || strings.HasPrefix(text, "\t") || (!newLogEntryPattern.MatchString(text) && currentEvent.Len() > 0) {
 			currentEvent.WriteString("\n")
@@ -274,10 +274,10 @@ func (lt *LogTailer) processTail(path string, t *tail.Tail) {
 			flushEvent()
 			currentEvent.WriteString(text)
 		}
-		
+
 		lastLine = text
 	}
-	
+
 	_ = lastLine
 }
 
@@ -291,7 +291,7 @@ func (lt *LogTailer) queueAnomaly(path, triggerLine string, contextLines []strin
 	if len(sigStr) > 500 {
 		sigStr = sigStr[:500]
 	}
-	
+
 	hash := sha256.Sum256([]byte(sigStr))
 	signature := hex.EncodeToString(hash[:])
 
@@ -302,7 +302,7 @@ func (lt *LogTailer) queueAnomaly(path, triggerLine string, contextLines []strin
 		buf.WriteString("\n")
 	}
 	payloadStr := buf.String()
-	
+
 	if len(payloadStr) > MaxPayloadBytes {
 		// Convert to rune slice to safely truncate without splitting multi-byte UTF-8 characters
 		// (e.g., emojis or international characters in logs) which would cause json.Marshal to fail.

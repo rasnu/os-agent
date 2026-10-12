@@ -62,13 +62,13 @@ type MockOSAdapter struct {
 	MockUninstallError error
 
 	// Callbacks for asserting behaviors
-	VerifyBinaryFunc  func(path string) error
-	ReplaceBinaryFunc func(tempPath, currentPath string) error
-	RestartAgentFunc  func() error
-	ManageServiceFunc func(action, service string) (string, error)
-	KillProcessFunc   func(pid string) (string, error)
-	StartPTYFunc      func(cols, rows uint16) (os_adapter.PTY, error)
-	WriteCronJobsFunc func(content string) error
+	VerifyBinaryFunc          func(path string) error
+	ReplaceBinaryFunc         func(tempPath, currentPath string) error
+	RestartAgentFunc          func() error
+	ManageServiceFunc         func(action, service string) (string, error)
+	KillProcessFunc           func(pid string) (string, error)
+	StartPTYFunc              func(cols, rows uint16) (os_adapter.PTY, error)
+	WriteCronJobsFunc         func(content string) error
 	GetShellCmdFunc           func(ctx context.Context, script string, runAsUser string) *exec.Cmd
 	ExecuteComputerActionFunc func(action, text string, x, y int) ([]byte, error)
 	GetMachineIDFunc          func() string

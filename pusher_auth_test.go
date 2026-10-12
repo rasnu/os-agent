@@ -36,4 +36,3 @@ func TestPusherClient_AuthenticateChannel_Failures(t *testing.T) {
 	client3 := NewPusherClient("ws://", "http://localhost:0/fail", "token", "srv", "")
 	client3.authenticateChannel("socket3", "channel3")
 }
-

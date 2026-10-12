@@ -20,11 +20,11 @@ func TestSecretStoreOperations(t *testing.T) {
 
 	// Test store
 	storeSecrets(token, secrets)
-	
+
 	secretStore.RLock()
 	entry, exists := secretStore.entries[token]
 	secretStore.RUnlock()
-	
+
 	if !exists {
 		t.Fatalf("Secret was not stored")
 	}
@@ -42,7 +42,7 @@ func TestSecretStoreOperations(t *testing.T) {
 	secretStore.RLock()
 	_, existsAfterWipe := secretStore.entries[token]
 	secretStore.RUnlock()
-	
+
 	if existsAfterWipe {
 		t.Errorf("Secret was not wiped after retrieval")
 	}
@@ -61,25 +61,25 @@ func TestBuildEnvWithSecrets(t *testing.T) {
 	storeSecrets(token, secrets)
 
 	baseEnv := []string{"EXISTING_VAR=abc"}
-	
+
 	env, injectedKeys := buildEnvWithSecrets(token, baseEnv)
-	
+
 	if len(env) != 2 {
 		t.Errorf("Expected env length 2, got %d", len(env))
 	}
 	if env[0] != "EXISTING_VAR=abc" {
 		t.Errorf("Base env modified or missing")
 	}
-	
+
 	// Map order isn't guaranteed, but since there's only 1 secret, it will be at index 1
 	if env[1] != "INJECTED_VAR=value123" {
 		t.Errorf("Secret not properly injected, got %s", env[1])
 	}
-	
+
 	if len(injectedKeys) != 1 || injectedKeys[0] != "INJECTED_VAR" {
 		t.Errorf("Injected keys not correct, got %v", injectedKeys)
 	}
-	
+
 	// Test build with no secrets
 	env2, injectedKeys2 := buildEnvWithSecrets("non-existent", baseEnv)
 	if !reflect.DeepEqual(env2, baseEnv) {
@@ -92,7 +92,7 @@ func TestBuildEnvWithSecrets(t *testing.T) {
 
 func TestSecretExpiry(t *testing.T) {
 	token := "expire-token"
-	
+
 	secretStore.Lock()
 	secretStore.entries[token] = &SecretEntry{
 		Secrets:   map[string]string{"K": "V"},
@@ -109,13 +109,13 @@ func TestSecretExpiry(t *testing.T) {
 func TestWipeSecrets(t *testing.T) {
 	token := "wipe-token"
 	storeSecrets(token, map[string]string{"K": "V"})
-	
+
 	wipeSecrets(token)
-	
+
 	secretStore.RLock()
 	_, exists := secretStore.entries[token]
 	secretStore.RUnlock()
-	
+
 	if exists {
 		t.Errorf("Secret was not wiped by wipeSecrets")
 	}

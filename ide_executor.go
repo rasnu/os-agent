@@ -146,13 +146,13 @@ func handleMultiReplaceFileContent(payload IdeIntentPayload) (string, error) {
 	}
 
 	target := payload.TargetFile
-	
+
 	// CRITICAL SECURITY FIX: Normalize the path to resolve all ../ and mixed slashes
 	cleanTarget, err := filepath.Abs(filepath.Clean(target))
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve absolute path: %v", err)
 	}
-	
+
 	// CRITICAL SECURITY FIX 10: Resolve Symlinks to prevent bypassing jails via symlink attacks
 	resolvedTarget, err := filepath.EvalSymlinks(cleanTarget)
 	if err != nil {
@@ -167,10 +167,10 @@ func handleMultiReplaceFileContent(payload IdeIntentPayload) (string, error) {
 			resolvedTarget = cleanTarget
 		}
 	}
-	
+
 	payload.TargetFile = resolvedTarget
 	lowerTarget := strings.ToLower(resolvedTarget)
-	
+
 	// Normalize Windows backslashes to forward slashes for unified prefix checking
 	normalizedLowerTarget := filepath.ToSlash(lowerTarget)
 
@@ -225,7 +225,7 @@ func handleMultiReplaceFileContent(payload IdeIntentPayload) (string, error) {
 		actualTargetContent := strings.Join(actualTargetLines, "\n")
 		expectedTargetContent := normalizeLineEndings(chunk.TargetContent)
 		expectedNorm := normalizeCodeBlockForMatch(expectedTargetContent)
-		
+
 		// Expected length in lines
 		expectedLen := len(strings.Split(expectedNorm, "\n"))
 
@@ -347,14 +347,14 @@ func handleWriteToFile(payload IdeIntentPayload) (string, error) {
 	}
 
 	target := payload.TargetFile
-	
+
 	// CRITICAL SECURITY FIX: Normalize the path to resolve all ../ and mixed slashes
 	// Otherwise //etc/passwd or c:/windows bypassing HasPrefix check!
 	cleanTarget, err := filepath.Abs(filepath.Clean(target))
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve absolute path: %v", err)
 	}
-	
+
 	// CRITICAL SECURITY FIX 10: Resolve Symlinks to prevent bypassing jails via symlink attacks
 	resolvedTarget, err := filepath.EvalSymlinks(cleanTarget)
 	if err != nil {
@@ -369,10 +369,10 @@ func handleWriteToFile(payload IdeIntentPayload) (string, error) {
 			resolvedTarget = cleanTarget
 		}
 	}
-	
+
 	target = resolvedTarget
 	lowerTarget := strings.ToLower(target)
-	
+
 	// Normalize Windows backslashes to forward slashes for unified prefix checking
 	normalizedLowerTarget := filepath.ToSlash(lowerTarget)
 

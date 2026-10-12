@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # Go module dependencies (gorilla/websocket, yamux, lumberjack, ...)
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "go"]
+
+  # Pinned GitHub Actions used by CI / release workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "ci"]

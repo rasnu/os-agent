@@ -341,4 +341,3 @@ func TestExecuteSelfUpdate_InvalidSignatureFormatFailsClosed(t *testing.T) {
 		t.Error("Expected ReplaceBinary to NOT be called for short signature")
 	}
 }
-

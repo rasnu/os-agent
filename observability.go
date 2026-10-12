@@ -4,7 +4,8 @@
  *
  * Milestone 3.3: HTTP health probe and Prometheus-compatible metrics endpoint.
  *
- * Exposes two endpoints on a dedicated port (default :9090, configurable via METRICS_PORT):
+ * Exposes two endpoints on a dedicated port (default 127.0.0.1:9090). The server binds to
+ * loopback only unless METRICS_BIND is set, and can be disabled with METRICS_PORT=off:
  *   GET /healthz  — Returns 200 OK with JSON { "status": "ok", "agent_version": "..." }
  *                   Used by container orchestrators (Kubernetes, Docker Compose) for liveness probes.
  *   GET /metrics  — Returns Prometheus text format metrics for Grafana/Datadog/PagerDuty scraping.
@@ -21,6 +22,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"sync/atomic"
@@ -122,12 +124,34 @@ agent_uptime_seconds %.0f
 	)
 }
 
+// metricsListenAddr resolves the bind address for the local observability server.
+// Security: defaults to loopback (127.0.0.1) so /metrics and /healthz are never
+// reachable from the network. Operators who scrape from another host must opt in
+// explicitly with METRICS_BIND (e.g. "0.0.0.0" or a private interface IP).
+// Returns "" when the server is disabled via METRICS_PORT=off|disabled|false.
+func metricsListenAddr() string {
+	port := os.Getenv("METRICS_PORT")
+	switch port {
+	case "":
+		port = "9090"
+	case "off", "disabled", "false":
+		return ""
+	}
+
+	bind := os.Getenv("METRICS_BIND")
+	if bind == "" {
+		bind = "127.0.0.1"
+	}
+	return net.JoinHostPort(bind, port)
+}
+
 // StartMetricsServer starts a lightweight HTTP server exposing /healthz and /metrics.
 // It runs in a background goroutine and respects the shutdown channel.
 func StartMetricsServer(shutdownChan chan struct{}) {
-	port := os.Getenv("METRICS_PORT")
-	if port == "" {
-		port = "9090"
+	addr := metricsListenAddr()
+	if addr == "" {
+		fmt.Println("[metrics] Local observability server disabled (METRICS_PORT=off)")
+		return
 	}
 
 	mux := http.NewServeMux()
@@ -135,7 +159,7 @@ func StartMetricsServer(shutdownChan chan struct{}) {
 	mux.HandleFunc("/metrics", metricsHandler)
 
 	srv := &http.Server{
-		Addr:         ":" + port,
+		Addr:         addr,
 		Handler:      mux,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
@@ -147,7 +171,7 @@ func StartMetricsServer(shutdownChan chan struct{}) {
 	}()
 
 	go func() {
-		fmt.Printf("[metrics] Listening on :%s — /healthz and /metrics\n", port)
+		fmt.Printf("[metrics] Listening on %s — /healthz and /metrics\n", addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			fmt.Printf("[metrics] Server error: %v\n", err)
 		}

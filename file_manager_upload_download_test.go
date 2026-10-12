@@ -190,11 +190,11 @@ func TestDownloadFile_DiskFull(t *testing.T) {
 
 	tempDir, _ := os.MkdirTemp("", "test_disk_full")
 	defer os.RemoveAll(tempDir)
-	
+
 	// Create read-only directory
 	readOnlyDir := filepath.Join(tempDir, "readonly")
 	os.Mkdir(readOnlyDir, 0555) // rx only, no w
-	
+
 	targetFile := filepath.Join(readOnlyDir, "should_fail.txt")
 
 	client.downloadFileFromDashboard("pipe", targetFile, ts.URL+"/agent/file/download")

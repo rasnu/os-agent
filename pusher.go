@@ -666,7 +666,7 @@ func (c *PusherClient) handleAgentCommand(command string, args map[string]interf
 		}
 
 		log.Printf("Executing raw command: %s (User: %s)", cmdStr, runAsUser)
-		
+
 		// Check if this is a specialized intent wrapper instead of a raw shell command
 		if strings.HasPrefix(cmdStr, "[COMPUTER_INTENT]") {
 			c.runCommand(func() { c.executeComputerIntent("sync", requestId, cmdStr) })

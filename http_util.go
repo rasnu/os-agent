@@ -72,7 +72,7 @@ func defaultTransport() http.RoundTripper {
 	if cfg := getGlobalTLSConfig(); cfg != nil {
 		baseTransport.TLSClientConfig = cfg
 	}
-	
+
 	// Force IPv4 for all agent outgoing requests to avoid broken IPv6 routes on customer VPSs
 	// which commonly cause 10s timeouts when dialing Cloudflare AAAA records.
 	baseTransport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -111,4 +111,3 @@ func setDefaultHTTPClient(client HTTPDoer) {
 	defer httpClientMu.Unlock()
 	defaultHTTPClient = client
 }
-

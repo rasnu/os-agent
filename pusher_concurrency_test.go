@@ -44,4 +44,3 @@ func TestPusherClient_ConcurrencyLimit2(t *testing.T) {
 	client.CancelAllCommands()
 	client.WaitCommands()
 }
-

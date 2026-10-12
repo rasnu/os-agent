@@ -17,35 +17,35 @@ import (
 )
 
 type AlertMonitor struct {
-	mu                  sync.Mutex
-	consecutiveCpuSpikes int
-	consecutiveRamSpikes int
-	consecutiveDiskSpikes int
-	consecutiveSwapSpikes int
+	mu                      sync.Mutex
+	consecutiveCpuSpikes    int
+	consecutiveRamSpikes    int
+	consecutiveDiskSpikes   int
+	consecutiveSwapSpikes   int
 	consecutiveIOWaitSpikes int
-	consecutiveLoadSpikes int
-	lastOOMMessage      string
-	lastAlertTime       time.Time
+	consecutiveLoadSpikes   int
+	lastOOMMessage          string
+	lastAlertTime           time.Time
 
 	thresholds AlertThresholds
 }
 
 type AlertThresholds struct {
-	CPU           float64 `json:"cpu"`
-	RAM           float64 `json:"ram"`
-	Disk          float64 `json:"disk"`
-	Swap          float64 `json:"swap"`
-	IOWait        float64 `json:"iowait"`
+	CPU            float64 `json:"cpu"`
+	RAM            float64 `json:"ram"`
+	Disk           float64 `json:"disk"`
+	Swap           float64 `json:"swap"`
+	IOWait         float64 `json:"iowait"`
 	LoadMultiplier float64 `json:"load_multiplier"`
 }
 
 var globalAlertMonitor = &AlertMonitor{
 	thresholds: AlertThresholds{
-		CPU:           95.0,
-		RAM:           95.0,
-		Disk:          90.0,
-		Swap:          80.0,
-		IOWait:        50.0,
+		CPU:            95.0,
+		RAM:            95.0,
+		Disk:           90.0,
+		Swap:           80.0,
+		IOWait:         50.0,
 		LoadMultiplier: 2.0,
 	},
 }
@@ -72,7 +72,7 @@ func UpdateAlertThresholds(raw map[string]interface{}) {
 	if val, ok := raw["load_multiplier"].(float64); ok && val > 0 {
 		globalAlertMonitor.thresholds.LoadMultiplier = val
 	}
-	
+
 	log.Printf("Applied new alert thresholds: %+v", globalAlertMonitor.thresholds)
 }
 
@@ -286,7 +286,7 @@ func (c *PusherClient) sendSystemAlert(payload AgentAlertPayload) {
 	req.Header.Set("Authorization", "Bearer "+c.Token)
 
 	log.Printf("🚨 Dispatching system alert to backend: %s (%.1f%%)", payload.Type, payload.Value)
-	
+
 	resp, err := heartbeatHTTPClient.Do(req)
 	if err != nil {
 		log.Printf("Failed to send system alert: %v", err)

@@ -101,12 +101,12 @@ func (c *PusherClient) handleFileCommand(action string, args map[string]interfac
 		defer os.RemoveAll(txBaseDir)
 
 		type fileOp struct {
-			Target string
-			Staging string
-			Backup string
-			HasBackup bool
+			Target       string
+			Staging      string
+			Backup       string
+			HasBackup    bool
 			OriginalMode os.FileMode
-			NewMode os.FileMode
+			NewMode      os.FileMode
 		}
 		var ops []fileOp
 
@@ -121,7 +121,7 @@ func (c *PusherClient) handleFileCommand(action string, args map[string]interfac
 			}
 			fPath, _ := fMap["path"].(string)
 			fContentB64, _ := fMap["content"].(string)
-			
+
 			if fPath == "" {
 				continue
 			}
@@ -141,7 +141,7 @@ func (c *PusherClient) handleFileCommand(action string, args map[string]interfac
 				hasError = true
 				break
 			}
-			
+
 			fModeStr, _ := fMap["mode"].(string)
 			var fMode os.FileMode = 0644
 			if fModeStr != "" {
@@ -151,11 +151,11 @@ func (c *PusherClient) handleFileCommand(action string, args map[string]interfac
 			}
 
 			op := fileOp{
-				Target: fPath,
-				Staging: filepath.Join(stagingDir, fmt.Sprintf("file_%d", i)),
-				Backup: filepath.Join(backupDir, fmt.Sprintf("file_%d", i)),
+				Target:    fPath,
+				Staging:   filepath.Join(stagingDir, fmt.Sprintf("file_%d", i)),
+				Backup:    filepath.Join(backupDir, fmt.Sprintf("file_%d", i)),
 				HasBackup: false,
-				NewMode: fMode,
+				NewMode:   fMode,
 			}
 
 			if stat, err := os.Stat(fPath); err == nil && !stat.IsDir() {

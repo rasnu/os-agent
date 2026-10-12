@@ -122,7 +122,7 @@ func (c *PusherClient) prepareTunnelHost(pipelineId, stepId, token string, reque
 			HostPolicy: autocert.HostWhitelist(domain),
 			Cache:      autocert.DirCache(cacheDir),
 		}
-		
+
 		l, err := net.Listen("tcp", ":443")
 		if err == nil {
 			publicListener = tls.NewListener(l, m.TLSConfig())
@@ -171,7 +171,7 @@ func (c *PusherClient) prepareTunnelHost(pipelineId, stepId, token string, reque
 
 			tlsConn := conn.(*tls.Conn)
 			tlsConn.SetDeadline(time.Now().Add(10 * time.Second))
-			
+
 			// 1. Force TLS Handshake
 			if err := tlsConn.Handshake(); err != nil {
 				log.Printf("mTLS handshake failed from %s: %v", conn.RemoteAddr(), err)
@@ -205,7 +205,7 @@ func (c *PusherClient) prepareTunnelHost(pipelineId, stepId, token string, reque
 		}
 
 		ts.session = session
-		
+
 		// Now we can accept public connections
 		for {
 			pubConn, err := ts.publicListener.Accept()
@@ -214,19 +214,19 @@ func (c *PusherClient) prepareTunnelHost(pipelineId, stepId, token string, reque
 			}
 			go func(pc net.Conn) {
 				defer pc.Close()
-				
+
 				if ts.session == nil || ts.session.IsClosed() {
 					log.Printf("No active yamux session to handle public traffic")
 					return
 				}
-				
+
 				stream, err := ts.session.Open()
 				if err != nil {
 					log.Printf("Failed to open yamux stream: %v", err)
 					return
 				}
 				defer stream.Close()
-				
+
 				proxyConn(pc, stream)
 			}(pubConn)
 		}
@@ -255,7 +255,7 @@ func shutdownTunnelHost(token string) {
 		if ts.publicListener != nil {
 			ts.publicListener.Close()
 		}
-		
+
 		os_adapter.Current().CloseFirewallHole(ts.controlPort)
 		os_adapter.Current().CloseFirewallHole(ts.publicPort)
 		activeTunnels.Delete(token)

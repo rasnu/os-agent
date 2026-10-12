@@ -119,7 +119,6 @@ func TestAgent_E2E_ExecuteCommand_And_Stream_Completion(t *testing.T) {
 	defer client.Close()
 	defer client.WaitCommands()
 
-
 	err := client.Connect()
 	if err != nil {
 		t.Fatalf("Failed to connect agent to mock websocket: %v", err)

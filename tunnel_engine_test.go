@@ -16,20 +16,20 @@ import (
 
 type DummyAdapter struct{}
 
-func (m *DummyAdapter) GetMetrics() (os_adapter.Metrics, []error)            { return os_adapter.Metrics{}, nil }
+func (m *DummyAdapter) GetMetrics() (os_adapter.Metrics, []error)                     { return os_adapter.Metrics{}, nil }
 func (m *DummyAdapter) GetShellCmd(ctx context.Context, s string, u string) *exec.Cmd { return nil }
-func (m *DummyAdapter) StartPTY(cols, rows uint16) (os_adapter.PTY, error)   { return nil, nil }
-func (m *DummyAdapter) InstallService(executablePath string) error           { return nil }
-func (m *DummyAdapter) UninstallService() error                              { return nil }
-func (m *DummyAdapter) VerifyBinary(path string) error                       { return nil }
-func (m *DummyAdapter) ReplaceBinary(tempPath, currentPath string) error     { return nil }
-func (m *DummyAdapter) RestartAgent() error                                  { return nil }
-func (m *DummyAdapter) ManageService(action, service string) (string, error) { return "", nil }
-func (m *DummyAdapter) KillProcess(pid string) (string, error)               { return "", nil }
-func (m *DummyAdapter) WriteCronJobs(content string) error                   { return nil }
-func (m *DummyAdapter) LogFilePath() string                                  { return "" }
-func (m *DummyAdapter) PunchFirewallHole(port int) error                     { return nil }
-func (m *DummyAdapter) CloseFirewallHole(port int) error                     { return nil }
+func (m *DummyAdapter) StartPTY(cols, rows uint16) (os_adapter.PTY, error)            { return nil, nil }
+func (m *DummyAdapter) InstallService(executablePath string) error                    { return nil }
+func (m *DummyAdapter) UninstallService() error                                       { return nil }
+func (m *DummyAdapter) VerifyBinary(path string) error                                { return nil }
+func (m *DummyAdapter) ReplaceBinary(tempPath, currentPath string) error              { return nil }
+func (m *DummyAdapter) RestartAgent() error                                           { return nil }
+func (m *DummyAdapter) ManageService(action, service string) (string, error)          { return "", nil }
+func (m *DummyAdapter) KillProcess(pid string) (string, error)                        { return "", nil }
+func (m *DummyAdapter) WriteCronJobs(content string) error                            { return nil }
+func (m *DummyAdapter) LogFilePath() string                                           { return "" }
+func (m *DummyAdapter) PunchFirewallHole(port int) error                              { return nil }
+func (m *DummyAdapter) CloseFirewallHole(port int) error                              { return nil }
 func (m *DummyAdapter) ExecuteComputerAction(action, text string, x, y int) ([]byte, error) {
 	return nil, nil
 }
@@ -163,7 +163,7 @@ func TestTunnelEngine_EndToEnd(t *testing.T) {
 
 	// Wait, control port expects TLS. We must do a TLS handshake!
 	// We'll skip it for now and just shutdown.
-	
+
 	// Cleanup
 	shutdownTunnelClient(token)
 	shutdownTunnelHost(token)
