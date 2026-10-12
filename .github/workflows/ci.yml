@@ -30,7 +30,16 @@ jobs:
         run: go vet ./...
 
       - name: Run 292 Tests with Race Detector
-        run: go test -v -race -cover ./...
+        run: |
+          set -o pipefail
+          go test -v -race -cover ./... 2>&1 | tee test_run.log
+
+      - name: Summarize Test Failures
+        if: failure()
+        run: |
+          echo "====================== TEST FAILURES ======================"
+          grep -E "(--- FAIL|FAIL:|panic:|WARNING: DATA RACE)" test_run.log -A 10 -B 2 || true
+          echo "=========================================================="
 
       - name: Dry-Run Multi-Platform Compilation
         run: |

@@ -16,26 +16,37 @@ func TestPusherClient_ConnectAndMonitor_Shutdown(t *testing.T) {
 	client := NewPusherClient("ws://localhost:9999", httpServer.URL, "token", "srv1", "")
 
 	shutdownChan := make(chan struct{})
+	done := make(chan struct{})
 
 	// Start in background. Since Connect fails, it will trigger the retry loop.
-	go client.ConnectAndMonitor(shutdownChan)
+	go func() {
+		client.ConnectAndMonitor(shutdownChan)
+		close(done)
+	}()
 
 	// Wait for it to hit the retry sleep, then close
 	time.Sleep(100 * time.Millisecond)
 	close(shutdownChan)
+
+	<-done
 }
 
 func TestPusherClient_MonitorConnection_Shutdown(t *testing.T) {
 	client := NewPusherClient("ws://localhost:9999", "http://localhost/api", "token", "srv1", "")
+	client.MonitorInterval = 1 * time.Millisecond
 
 	shutdownChan := make(chan struct{})
+	done := make(chan struct{})
 
-	monitorTickerDuration = 1 * time.Millisecond
-	defer func() { monitorTickerDuration = 30 * time.Second }()
 	// Start monitor
-	go client.monitorConnection(shutdownChan)
+	go func() {
+		client.monitorConnection(shutdownChan)
+		close(done)
+	}()
 
 	// Wait and close
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	close(shutdownChan)
+
+	<-done
 }

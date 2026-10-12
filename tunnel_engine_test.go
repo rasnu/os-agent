@@ -37,9 +37,9 @@ func (m *DummyAdapter) GetMachineID() string { return "dummy-machine-id" }
 
 func TestTunnelEngine_EndToEnd(t *testing.T) {
 	// Mock OS adapter
+	originalAdapter := os_adapter.Current()
 	os_adapter.SetAdapter(&DummyAdapter{})
-	// No defer, just leave it as DummyAdapter for the rest of tests in this package if they need it,
-	// or they should mock it themselves.
+	defer os_adapter.SetAdapter(originalAdapter)
 
 	// Mock HTTP client to capture completion payloads
 	var capturedBodies [][]byte

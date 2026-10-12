@@ -9,6 +9,9 @@ import (
 )
 
 func TestStartTerminal(t *testing.T) {
+	originalAdapter := os_adapter.Current()
+	defer os_adapter.SetAdapter(originalAdapter)
+
 	mockAdapter := &MockOSAdapter{
 		StartPTYFunc: func(cols, rows uint16) (os_adapter.PTY, error) {
 			return &MockPTY{
@@ -173,9 +176,17 @@ func TestIsValidTermID(t *testing.T) {
 }
 
 func TestStartTerminal_LimitsAndValidation(t *testing.T) {
+	originalAdapter := os_adapter.Current()
+	defer os_adapter.SetAdapter(originalAdapter)
+
 	mockAdapter := &MockOSAdapter{
 		StartPTYFunc: func(cols, rows uint16) (os_adapter.PTY, error) {
-			return &MockPTY{}, nil
+			return &MockPTY{
+				ReadFunc: func(p []byte) (n int, err error) {
+					time.Sleep(1 * time.Second)
+					return 0, nil
+				},
+			}, nil
 		},
 	}
 	os_adapter.SetAdapter(mockAdapter)

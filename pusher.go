@@ -60,6 +60,7 @@ type PusherClient struct {
 	closed           bool          // Prevents write-after-close panics
 	hasConnectedOnce bool          // True after the first successful connection; used to distinguish reconnects from initial connects
 	logTailer        *LogTailer    // Background Log Tailing Engine
+	MonitorInterval  time.Duration // Override ping/heartbeat monitoring interval (used in tests)
 }
 
 type PusherMessage struct {
@@ -181,10 +182,12 @@ func (c *PusherClient) ConnectAndMonitor(shutdownChan chan struct{}) {
 	}
 }
 
-var monitorTickerDuration = pingPeriod
-
 func (c *PusherClient) monitorConnection(shutdownChan chan struct{}) {
-	ticker := time.NewTicker(monitorTickerDuration)
+	dur := c.MonitorInterval
+	if dur == 0 {
+		dur = pingPeriod
+	}
+	ticker := time.NewTicker(dur)
 	defer ticker.Stop()
 	failures := 0
 	heartbeatFailures := 0

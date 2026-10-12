@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"os/exec"
 
 	"rasnuos-agent/os_adapter"
@@ -19,7 +20,7 @@ func (m *MockPTY) Read(p []byte) (n int, err error) {
 	if m.ReadFunc != nil {
 		return m.ReadFunc(p)
 	}
-	return 0, nil
+	return 0, io.EOF
 }
 
 func (m *MockPTY) Write(p []byte) (n int, err error) {

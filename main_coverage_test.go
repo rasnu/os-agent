@@ -50,16 +50,26 @@ func TestRun_MissingTokens(t *testing.T) {
 }
 
 func TestRun_Success(t *testing.T) {
-	// Schedule interrupt
+	os.Setenv("METRICS_PORT", "0")
+	defer os.Unsetenv("METRICS_PORT")
+
+	done := make(chan error, 1)
 	go func() {
-		time.Sleep(50 * time.Millisecond)
-		// Send interrupt to ourselves
-		proc, _ := os.FindProcess(os.Getpid())
-		proc.Signal(syscall.SIGINT)
+		done <- run([]string{"--token", "test", "--server-id", "test"})
 	}()
 
-	err := run([]string{"--token", "test", "--server-id", "test"})
-	if err != nil {
-		t.Errorf("run returned error: %v", err)
+	// Give adequate time for signal handler registration
+	time.Sleep(300 * time.Millisecond)
+
+	proc, _ := os.FindProcess(os.Getpid())
+	proc.Signal(syscall.SIGINT)
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("run returned error: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Errorf("run timed out waiting for SIGINT shutdown")
 	}
 }
