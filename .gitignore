@@ -29,6 +29,8 @@ rasnuos-agent-*
 
 # All compiled release binaries go here; never commit them
 build/
+dist/
+dist-test/
 
 # -----------------------------------------------------------------------------
 # Test artifacts
@@ -68,6 +70,9 @@ rasnuos-agent.log
 agent.env
 .env.local
 .env.*.local
+.agent_update_keys/
+*.key
+*.pem
 
 # -----------------------------------------------------------------------------
 # Go toolchain

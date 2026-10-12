@@ -159,28 +159,11 @@ func (c *PusherClient) executeAndStream(pipelineId string, stepId string, comman
 	log.Printf("Executing: %s", safeCommand)
 
 	// --- PILLAR 4: Command Guardrails ---
-	destructivePatterns := []*regexp.Regexp{
-		// Linux/macOS: recursive force delete of system directories
-		regexp.MustCompile(`(?i)\brm\s+(?:-[a-z]*r[a-z]*f[a-z]*\s+|-[a-z]*f[a-z]*r[a-z]*\s+)(?:/\s*|/\*|/var|/etc|/usr|/bin|/sbin)\b`),
-		// Linux: mkfs (format a filesystem)
-		regexp.MustCompile(`(?i)\bmkfs\b`),
-		// Linux: dd zero-wipe of a device
-		regexp.MustCompile(`(?i)\bdd\s+if=/dev/zero\b`),
-		// Linux: chmod 777 on root or system paths
-		regexp.MustCompile(`(?i)\bchmod\s+(?:-[a-z]*R[a-z]*\s+)?777\s+/`),
-		// Windows: Remove-Item -Recurse -Force on drive roots or system dirs
-		regexp.MustCompile(`(?i)Remove-Item\s+.*-(?:Recurse|r)\b.*(?:[A-Za-z]:\\\\?\s*$|[A-Za-z]:\\\\Windows|[A-Za-z]:\\\\System)`),
-		// Windows: format drive command (format C: /q or format C: /y)
-		regexp.MustCompile(`(?i)\bformat\s+[A-Za-z]:\s*(?:/|\z)`),
-	}
-
-	for _, re := range destructivePatterns {
-		if re.MatchString(command) {
-			errMsg := fmt.Sprintf("\n[GUARDRAIL BLOCK] Destructive command matched pattern '%s' and is prohibited in Strict Mode.\n", re.String())
-			c.streamLogWS(pipelineId, stepId, errMsg, nil)
-			c.sendCompletion(pipelineId, stepId, false, errMsg)
-			return
-		}
+	if blocked, pattern := isCommandDestructive(command); blocked {
+		errMsg := fmt.Sprintf("\n[GUARDRAIL BLOCK] Destructive command matched pattern '%s' and is prohibited in Strict Mode.\n", pattern)
+		c.streamLogWS(pipelineId, stepId, errMsg, nil)
+		c.sendCompletion(pipelineId, stepId, false, errMsg)
+		return
 	}
 	// ------------------------------------
 
@@ -362,7 +345,9 @@ func (c *PusherClient) streamLogWS(pipelineId string, stepId string, chunk strin
 }
 
 func (c *PusherClient) streamLogHTTP(pipelineId string, stepId string, chunk string) {
+	c.wg.Add(1)
 	go func(pid string, sid string, chk string) {
+		defer c.wg.Done()
 		streamURL := fmt.Sprintf("%s/agent/stream", c.ApiURL)
 		reqBody, err := json.Marshal(map[string]interface{}{
 			"pipeline_id": pid,
@@ -524,6 +509,20 @@ func (c *PusherClient) sendDiscoveryCompletion(output string) {
 var commandTimeout = 1 * time.Hour
 
 func (c *PusherClient) executeRawCommand(requestId, cmdStr, runAsUser string) {
+	if blocked, pattern := isCommandDestructive(cmdStr); blocked {
+		errMsg := fmt.Sprintf("\n[GUARDRAIL BLOCK] Destructive command matched pattern '%s' and is prohibited in Strict Mode.\n", pattern)
+		logAuditEvent(AuditEvent{
+			Action:     "execute_raw_command",
+			StepID:     requestId,
+			Command:    redactSecrets(cmdStr),
+			RunAsUser:  runAsUser,
+			Success:    false,
+			Error:      errMsg,
+		})
+		c.sendCompletion("sync", requestId, false, errMsg)
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
 	defer cancel()
 

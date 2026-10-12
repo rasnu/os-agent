@@ -45,9 +45,15 @@ func secureTLSConfig(pins string) *tls.Config {
 	}
 }
 
-// applyTLSPinToDefaultTransport intercepts the global HTTP transport to enforce pinning.
+// applyTLSPinToDefaultTransport intercepts the global HTTP transport and all agent HTTP clients to enforce pinning.
 func applyTLSPinToDefaultTransport(pins string) {
-	if transport, ok := http.DefaultTransport.(*http.Transport); ok {
-		transport.TLSClientConfig = secureTLSConfig(pins)
+	if strings.TrimSpace(pins) == "" {
+		return
 	}
+	cfg := secureTLSConfig(pins)
+	if transport, ok := http.DefaultTransport.(*http.Transport); ok {
+		transport.TLSClientConfig = cfg
+	}
+	SetGlobalTLSConfig(cfg)
 }
+

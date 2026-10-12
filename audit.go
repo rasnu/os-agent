@@ -22,7 +22,19 @@ type AuditEvent struct {
 	Error      string `json:"error,omitempty"`
 }
 
-var auditMutex sync.Mutex
+var (
+	auditMutex            sync.Mutex
+	auditFilePathOverride string
+)
+
+func getAuditFilePath() string {
+	if auditFilePathOverride != "" {
+		return auditFilePathOverride
+	}
+	logFile := os_adapter.Current().LogFilePath()
+	logDir := filepath.Dir(logFile)
+	return filepath.Join(logDir, "audit.jsonl")
+}
 
 func logAuditEvent(event AuditEvent) {
 	auditMutex.Lock()
@@ -30,21 +42,30 @@ func logAuditEvent(event AuditEvent) {
 
 	event.Timestamp = time.Now().UTC().Format(time.RFC3339)
 
-	logFile := os_adapter.Current().LogFilePath()
-	logDir := filepath.Dir(logFile)
-	auditFile := filepath.Join(logDir, "audit.jsonl")
+	auditFile := getAuditFilePath()
+	logDir := filepath.Dir(auditFile)
 
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, 0700); err != nil {
 		log.Printf("ERROR: [Audit Subsystem] Failed to create audit log directory %q: %v", logDir, err)
 		return
 	}
 
-	f, err := os.OpenFile(auditFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(auditFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
-		log.Printf("ERROR: [Audit Subsystem] Failed to open audit log %q: %v", auditFile, err)
-		return
+		// Fallback to local directory if system log path is inaccessible
+		if auditFilePathOverride == "" {
+			auditFile = "audit.jsonl"
+			f, err = os.OpenFile(auditFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		}
+		if err != nil {
+			log.Printf("ERROR: [Audit Subsystem] Failed to open audit log %q: %v", auditFile, err)
+			return
+		}
 	}
 	defer f.Close()
+
+	// Enforce 0600 permissions even if the file was created with looser permissions previously
+	_ = os.Chmod(auditFile, 0600)
 
 	b, err := json.Marshal(event)
 	if err != nil {

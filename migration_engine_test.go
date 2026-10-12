@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -31,15 +32,17 @@ func TestHandleMigrationCommand(t *testing.T) {
 
 func TestMigrationEngine_SingleFilePush(t *testing.T) {
 	// 1. Setup mock Laravel Webhook
+	var mu sync.Mutex
 	var webhookPayload map[string]interface{}
-	var progressPayload map[string]interface{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		if r.URL.Path == "/agent/pipeline/progress" {
-			json.Unmarshal(body, &progressPayload)
-		} else {
-			json.Unmarshal(body, &webhookPayload)
+		var p map[string]interface{}
+		json.Unmarshal(body, &p)
+		mu.Lock()
+		if r.URL.Path == "/agent/migration/complete" {
+			webhookPayload = p
 		}
+		mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()
@@ -99,10 +102,17 @@ func TestMigrationEngine_SingleFilePush(t *testing.T) {
 }
 
 func TestMigrationEngine_Security_FingerprintMismatch(t *testing.T) {
+	var mu sync.Mutex
 	var webhookPayload map[string]interface{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		json.Unmarshal(body, &webhookPayload)
+		var p map[string]interface{}
+		json.Unmarshal(body, &p)
+		mu.Lock()
+		if r.URL.Path == "/agent/migration/complete" {
+			webhookPayload = p
+		}
+		mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()
@@ -140,10 +150,17 @@ func TestMigrationEngine_Security_FingerprintMismatch(t *testing.T) {
 }
 
 func TestMigrationEngine_DirectoryPull(t *testing.T) {
+	var mu sync.Mutex
 	var webhookPayload map[string]interface{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		json.Unmarshal(body, &webhookPayload)
+		var p map[string]interface{}
+		json.Unmarshal(body, &p)
+		mu.Lock()
+		if r.URL.Path == "/agent/migration/complete" {
+			webhookPayload = p
+		}
+		mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()
@@ -196,10 +213,17 @@ func TestMigrationEngine_DirectoryPull(t *testing.T) {
 }
 
 func TestMigrationEngine_NetworkInterrupt(t *testing.T) {
+	var mu sync.Mutex
 	var webhookPayload map[string]interface{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		json.Unmarshal(body, &webhookPayload)
+		var p map[string]interface{}
+		json.Unmarshal(body, &p)
+		mu.Lock()
+		if r.URL.Path == "/agent/migration/complete" {
+			webhookPayload = p
+		}
+		mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()

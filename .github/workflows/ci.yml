@@ -1,0 +1,39 @@
+name: Agent CI
+
+on:
+  push:
+    branches: [ "main", "develop", "master" ]
+  pull_request:
+    branches: [ "main", "develop", "master" ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Agent Test Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Verify Dependencies
+        run: go mod verify
+
+      - name: Run Go Vet
+        run: go vet ./...
+
+      - name: Run 292 Tests with Race Detector
+        run: go test -v -race -cover ./...
+
+      - name: Dry-Run Multi-Platform Compilation
+        run: |
+          chmod +x ./build-all.sh
+          OUTPUT_DIR="./dist-test" ./build-all.sh
+          rm -rf ./dist-test

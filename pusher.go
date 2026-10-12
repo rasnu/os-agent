@@ -13,9 +13,11 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"rasnuos-agent/os_adapter"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +27,9 @@ import (
 
 // MaxConcurrentCommands limits concurrent command execution. Excess requests are rejected.
 const MaxConcurrentCommands = 10
+
+// DefaultCommandRateLimit limits inbound command events from WebSocket per minute.
+const DefaultCommandRateLimit = 100
 
 // serviceNamePattern prevents shell injection via systemctl.
 var serviceNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._@\-]+$`)
@@ -51,9 +56,10 @@ type PusherClient struct {
 	activeCommands   map[string]context.CancelFunc
 	cmdMutex         sync.Mutex
 	cmdSemaphore     chan struct{} // Limits concurrent command execution
-	closed           bool         // Prevents write-after-close panics
-	hasConnectedOnce bool         // True after the first successful connection; used to distinguish reconnects from initial connects
-	logTailer        *LogTailer   // Background Log Tailing Engine
+	rateLimiter      *RateLimiter  // Limits inbound command events execution rate
+	closed           bool          // Prevents write-after-close panics
+	hasConnectedOnce bool          // True after the first successful connection; used to distinguish reconnects from initial connects
+	logTailer        *LogTailer    // Background Log Tailing Engine
 }
 
 type PusherMessage struct {
@@ -72,6 +78,13 @@ type PusherDataString struct {
 }
 
 func NewPusherClient(serverURL, apiURL, token, serverId, tlsPin string) *PusherClient {
+	rateLimit := DefaultCommandRateLimit
+	if envLimit := os.Getenv("AGENT_RATE_LIMIT_PER_MINUTE"); envLimit != "" {
+		if parsed, err := strconv.Atoi(envLimit); err == nil {
+			rateLimit = parsed
+		}
+	}
+
 	return &PusherClient{
 		ServerURL:      serverURL,
 		ApiURL:         apiURL,
@@ -80,8 +93,14 @@ func NewPusherClient(serverURL, apiURL, token, serverId, tlsPin string) *PusherC
 		TLSPin:         tlsPin,
 		activeCommands: make(map[string]context.CancelFunc),
 		cmdSemaphore:   make(chan struct{}, MaxConcurrentCommands),
+		rateLimiter:    NewRateLimiter(rateLimit),
 		logTailer:      NewLogTailer(apiURL, token, serverId),
 	}
+}
+
+// SetRateLimiter allows overriding the command rate limiter (e.g., in unit tests).
+func (c *PusherClient) SetRateLimiter(rl *RateLimiter) {
+	c.rateLimiter = rl
 }
 
 func (c *PusherClient) Connect() error {
@@ -351,14 +370,22 @@ func (c *PusherClient) readPump() {
 				continue
 			}
 
+			pipelineId := getString(payload, "pipeline_id")
+			stepId := getString(payload, "step_id")
+
+			if c.rateLimiter != nil && !c.rateLimiter.Allow() {
+				log.Printf("Rate limit exceeded for ExecuteSelfUpdate (max %d commands/min)", c.rateLimiter.Capacity())
+				logAuditEvent(AuditEvent{Action: "rate_limit_exceeded", Command: "ExecuteSelfUpdate", Success: false, Error: "Rate limit exceeded (100 commands/min)"})
+				c.sendCompletion(pipelineId, stepId, false, fmt.Sprintf("Agent rejected self-update: rate limit exceeded (maximum %d commands/minute).", c.rateLimiter.Capacity()))
+				continue
+			}
+
 			downloadUrl := getString(payload, "download_url")
 			if downloadUrl == "" {
 				log.Printf("ExecuteSelfUpdate missing download_url, skipping")
 				continue
 			}
 
-			pipelineId := getString(payload, "pipeline_id")
-			stepId := getString(payload, "step_id")
 			signature := getString(payload, "signature")
 
 			log.Printf("Received self-update command, downloading from %s", downloadUrl)
@@ -378,6 +405,14 @@ func (c *PusherClient) readPump() {
 
 			if stepId == "" || command == "" {
 				log.Printf("ExecuteCommand missing step_id or command, skipping")
+				continue
+			}
+
+			if c.rateLimiter != nil && !c.rateLimiter.Allow() {
+				log.Printf("Rate limit exceeded for ExecuteCommand on step %s (max %d commands/min)", stepId, c.rateLimiter.Capacity())
+				logAuditEvent(AuditEvent{Action: "rate_limit_exceeded", Command: fmt.Sprintf("ExecuteCommand:%s", stepId), Success: false, Error: "Rate limit exceeded"})
+				TrackCommandError()
+				c.sendCompletion(pipelineId, stepId, false, fmt.Sprintf("Agent rejected command: rate limit exceeded (maximum %d commands/minute). Try again shortly.", c.rateLimiter.Capacity()))
 				continue
 			}
 
@@ -447,6 +482,12 @@ func (c *PusherClient) readPump() {
 				continue
 			}
 
+			if c.rateLimiter != nil && !c.rateLimiter.Allow() {
+				log.Printf("Rate limit exceeded for ExecuteDiscovery (max %d commands/min)", c.rateLimiter.Capacity())
+				logAuditEvent(AuditEvent{Action: "rate_limit_exceeded", Command: "ExecuteDiscovery", Success: false, Error: "Rate limit exceeded"})
+				continue
+			}
+
 			log.Printf("Received discovery request")
 			c.runCommand(func() { c.executeDiscovery(script) })
 
@@ -460,6 +501,17 @@ func (c *PusherClient) readPump() {
 			args, ok := payload["payload"].(map[string]interface{})
 			if !ok {
 				args = make(map[string]interface{})
+			}
+
+			if c.rateLimiter != nil && !c.rateLimiter.Allow() {
+				log.Printf("Rate limit exceeded for AgentCommandIssued:%s (max %d commands/min)", command, c.rateLimiter.Capacity())
+				logAuditEvent(AuditEvent{Action: "rate_limit_exceeded", Command: fmt.Sprintf("AgentCommandIssued:%s", command), Success: false, Error: "Rate limit exceeded"})
+				pipelineId := getString(args, "pipeline_id")
+				stepId := getString(args, "step_id")
+				if stepId != "" {
+					c.sendCompletion(pipelineId, stepId, false, fmt.Sprintf("Agent rejected command %s: rate limit exceeded (%d commands/min).", command, c.rateLimiter.Capacity()))
+				}
+				continue
 			}
 
 			switch command {
@@ -492,7 +544,12 @@ func (c *PusherClient) readPump() {
 				continue
 			}
 			termID := getString(payload, "term_id")
-			if termID != "" {
+			if termID != "" && isValidTermID(termID) {
+				if c.rateLimiter != nil && !c.rateLimiter.Allow() {
+					log.Printf("Rate limit exceeded for client-TerminalStart on session %s (max %d commands/min)", termID, c.rateLimiter.Capacity())
+					logAuditEvent(AuditEvent{Action: "pty_session_rate_limited", Command: termID, Success: false, Error: "Rate limit exceeded"})
+					continue
+				}
 				c.runCommand(func() { c.StartTerminal(termID, false, "") })
 			}
 
@@ -504,7 +561,7 @@ func (c *PusherClient) readPump() {
 			termID := getString(payload, "term_id")
 			data := getString(payload, "data")
 
-			if termID != "" {
+			if termID != "" && isValidTermID(termID) {
 				sessionMutex.Lock()
 				if session, exists := activeSessions[termID]; exists {
 					session.Write([]byte(data))
@@ -521,7 +578,7 @@ func (c *PusherClient) readPump() {
 			cols := getFloat(payload, "cols")
 			rows := getFloat(payload, "rows")
 
-			if termID != "" {
+			if termID != "" && isValidTermID(termID) {
 				sessionMutex.Lock()
 				if session, exists := activeSessions[termID]; exists {
 					session.Resize(uint16(rows), uint16(cols))
@@ -536,7 +593,7 @@ func (c *PusherClient) readPump() {
 			}
 			termID := getString(payload, "term_id")
 
-			if termID != "" {
+			if termID != "" && isValidTermID(termID) {
 				// DEADLOCK FIX: client-TerminalStop previously called session.Close() while
 				// holding sessionMutex. But Close() also tries to acquire sessionMutex to
 				// remove itself from activeSessions → permanent mutex deadlock → readPump
@@ -559,6 +616,7 @@ func (c *PusherClient) readPump() {
 					}
 					session.mu.Unlock()
 					session.closeInternal()
+					logAuditEvent(AuditEvent{Action: "pty_session_close", Command: termID, Success: true})
 					log.Printf("Terminal session %s stopped by client", termID)
 				}
 			}

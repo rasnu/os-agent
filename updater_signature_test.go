@@ -13,6 +13,9 @@ import (
 )
 
 func TestExecuteSelfUpdate_WithValidSignature(t *testing.T) {
+	_, cleanupHTTP := setupMockHTTP()
+	defer cleanupHTTP()
+
 	// Generate an Ed25519 keypair dynamically for the test
 	pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -46,7 +49,10 @@ func TestExecuteSelfUpdate_WithValidSignature(t *testing.T) {
 	os_adapter.SetAdapter(mockAdapter)
 	defer os_adapter.SetAdapter(originalAdapter)
 
-	client := &PusherClient{ServerID: "test-server"}
+	client := &PusherClient{
+		ServerID: "test-server",
+		ApiURL:   "http://mock-backend",
+	}
 
 	// Temporarily override the global public key for the test
 	originalKey := AgentPublicKeyBase64
@@ -62,6 +68,9 @@ func TestExecuteSelfUpdate_WithValidSignature(t *testing.T) {
 }
 
 func TestExecuteSelfUpdate_WithInvalidSignature(t *testing.T) {
+	_, cleanupHTTP := setupMockHTTP()
+	defer cleanupHTTP()
+
 	// Generate an Ed25519 keypair
 	pubKey, privKey, _ := ed25519.GenerateKey(rand.Reader)
 
@@ -91,7 +100,10 @@ func TestExecuteSelfUpdate_WithInvalidSignature(t *testing.T) {
 	os_adapter.SetAdapter(mockAdapter)
 	defer os_adapter.SetAdapter(originalAdapter)
 
-	client := &PusherClient{ServerID: "test-server"}
+	client := &PusherClient{
+		ServerID: "test-server",
+		ApiURL:   "http://mock-backend",
+	}
 
 	originalKey := AgentPublicKeyBase64
 	AgentPublicKeyBase64 = base64.StdEncoding.EncodeToString(pubKey)
@@ -106,6 +118,9 @@ func TestExecuteSelfUpdate_WithInvalidSignature(t *testing.T) {
 }
 
 func TestExecuteSelfUpdate_ProductionFailsClosed(t *testing.T) {
+	_, cleanupHTTP := setupMockHTTP()
+	defer cleanupHTTP()
+
 	pubKey, _, _ := ed25519.GenerateKey(rand.Reader)
 	mockBinaryData := []byte("binary data")
 
@@ -128,7 +143,10 @@ func TestExecuteSelfUpdate_ProductionFailsClosed(t *testing.T) {
 	os_adapter.SetAdapter(mockAdapter)
 	defer os_adapter.SetAdapter(originalAdapter)
 
-	client := &PusherClient{ServerID: "test-server"}
+	client := &PusherClient{
+		ServerID: "test-server",
+		ApiURL:   "http://mock-backend",
+	}
 
 	originalKey := AgentPublicKeyBase64
 	AgentPublicKeyBase64 = base64.StdEncoding.EncodeToString(pubKey)

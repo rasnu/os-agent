@@ -97,6 +97,7 @@ func runAgent(args []string, shutdown chan struct{}) error {
 	serverIdFlag := fs.String("server-id", "", "ID of the Server in RasnuOS")
 	tlsPinFlag := fs.String("tls-pin", "", "Comma-separated list of SHA-256 SPKI hashes for TLS certificate pinning (falls back to TLS_PIN env var)")
 	versionFlag := fs.Bool("version", false, "Print version and exit")
+	keyInfoFlag := fs.Bool("key-info", false, "Print update public key status and exit")
 
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -104,6 +105,17 @@ func runAgent(args []string, shutdown chan struct{}) error {
 
 	if *versionFlag {
 		fmt.Printf("rasnuos-agent %s\n", version)
+		return nil
+	}
+
+	if *keyInfoFlag {
+		pubKey, err := getAgentPublicKey()
+		if err != nil {
+			fmt.Printf("Update Public Key: unconfigured (%v)\n", err)
+			return err
+		}
+		fmt.Printf("Update Public Key: configured (%s)\n", AgentPublicKeyBase64)
+		_ = pubKey
 		return nil
 	}
 

@@ -82,3 +82,47 @@ func TestMain_GracefulInterrupt(t *testing.T) {
 		t.Fatalf("Timeout waiting for run() to exit after SIGTERM")
 	}
 }
+
+func TestMain_KeyInfoFlag(t *testing.T) {
+	origKey := AgentPublicKeyBase64
+	defer func() { AgentPublicKeyBase64 = origKey }()
+
+	// 1. Unconfigured
+	AgentPublicKeyBase64 = ""
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err := run([]string{"--key-info"})
+	w.Close()
+	os.Stdout = oldStdout
+
+	if err == nil {
+		t.Errorf("Expected error for --key-info when unconfigured")
+	}
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	if !strings.Contains(buf.String(), "unconfigured") {
+		t.Errorf("Expected 'unconfigured' in output, got: %s", buf.String())
+	}
+
+	// 2. Configured
+	testKey := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+	AgentPublicKeyBase64 = testKey
+	r2, w2, _ := os.Pipe()
+	os.Stdout = w2
+
+	err = run([]string{"--key-info"})
+	w2.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Errorf("Expected nil error for --key-info when configured, got: %v", err)
+	}
+	var buf2 bytes.Buffer
+	io.Copy(&buf2, r2)
+	if !strings.Contains(buf2.String(), "configured") || !strings.Contains(buf2.String(), testKey) {
+		t.Errorf("Expected 'configured' and key in output, got: %s", buf2.String())
+	}
+}
+

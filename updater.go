@@ -13,13 +13,51 @@ import (
 	"rasnuos-agent/os_adapter"
 )
 
-// In production, this key will be injected during the agent build process.
+// In production, this key must be injected during the agent build process via -ldflags.
+// Example: -ldflags "-X main.AgentPublicKeyBase64=<base64_pubkey>"
 // It matches the private key stored securely in the Laravel backend.
-var AgentPublicKeyBase64 = "1111111111111111111111111111111111111111111=" // Replace with actual base64 pubkey
+// By default, it is unconfigured ("") to enforce a strict fail-closed architecture.
+var AgentPublicKeyBase64 = ""
+
+// getAgentPublicKey returns the decoded Ed25519 public key if configured.
+// Fails closed if unconfigured, placeholder, or invalid length.
+func getAgentPublicKey() (ed25519.PublicKey, error) {
+	if AgentPublicKeyBase64 == "" || AgentPublicKeyBase64 == "1111111111111111111111111111111111111111111=" {
+		return nil, fmt.Errorf("agent public key is not configured (fail-closed)")
+	}
+	pubKeyBytes, err := base64.StdEncoding.DecodeString(AgentPublicKeyBase64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base64 encoding in agent public key: %w", err)
+	}
+	if len(pubKeyBytes) != ed25519.PublicKeySize {
+		return nil, fmt.Errorf("invalid public key length %d (expected %d bytes)", len(pubKeyBytes), ed25519.PublicKeySize)
+	}
+	return ed25519.PublicKey(pubKeyBytes), nil
+}
 
 func (c *PusherClient) executeSelfUpdate(downloadUrl, signatureBase64, pipelineId, stepId string) {
-
 	log.Printf("Starting self-update from %s", downloadUrl)
+
+	// STRICT FAIL-CLOSED SECURITY:
+	// 1. Verify agent has a valid embedded public key BEFORE downloading
+	pubKey, err := getAgentPublicKey()
+	if err != nil {
+		c.reportUpdateFailure(pipelineId, stepId, "SECURITY ALERT: This agent was compiled without a valid production public key. Self-update aborted to prevent unverified execution.")
+		return
+	}
+
+	// 2. Cryptographic signature is strictly mandatory for all self-updates
+	if signatureBase64 == "" {
+		c.reportUpdateFailure(pipelineId, stepId, "SECURITY ALERT: This agent requires a cryptographically signed update. No signature was provided. Update aborted.")
+		return
+	}
+
+	// 3. Decode and validate signature encoding and length (Ed25519 signatures are 64 bytes)
+	sigBytes, err := base64.StdEncoding.DecodeString(signatureBase64)
+	if err != nil || len(sigBytes) != ed25519.SignatureSize {
+		c.reportUpdateFailure(pipelineId, stepId, "SECURITY ALERT: Invalid base64 signature format or length from backend. Update aborted.")
+		return
+	}
 
 	// Determine current executable path
 	executablePath, err := os.Executable()
@@ -37,46 +75,18 @@ func (c *PusherClient) executeSelfUpdate(downloadUrl, signatureBase64, pipelineI
 	}
 	defer os.Remove(tempPath)
 
-	// Fail-closed security architecture: if the backend sends a signature, we MUST verify it.
-	if signatureBase64 != "" {
-		if AgentPublicKeyBase64 == "1111111111111111111111111111111111111111111=" {
-			c.reportUpdateFailure(pipelineId, stepId, "SECURITY ALERT: Update signature was provided, but this agent was compiled without a valid public key. Aborting to prevent bypass.")
-			return
-		}
-
-		log.Printf("Verifying binary signature...")
-		pubKeyBytes, err := base64.StdEncoding.DecodeString(AgentPublicKeyBase64)
-		if err != nil || len(pubKeyBytes) != ed25519.PublicKeySize {
-			c.reportUpdateFailure(pipelineId, stepId, "Invalid embedded agent public key")
-			return
-		}
-
-		sigBytes, err := base64.StdEncoding.DecodeString(signatureBase64)
-		if err != nil {
-			c.reportUpdateFailure(pipelineId, stepId, "Invalid base64 signature from backend")
-			return
-		}
-
-		binaryData, err := os.ReadFile(tempPath)
-		if err != nil {
-			c.reportUpdateFailure(pipelineId, stepId, fmt.Sprintf("Failed to read downloaded binary for verification: %v", err))
-			return
-		}
-
-		if !ed25519.Verify(pubKeyBytes, binaryData, sigBytes) {
-			c.reportUpdateFailure(pipelineId, stepId, "SECURITY ALERT: Signature verification failed. The update payload may have been tampered with.")
-			return
-		}
-		log.Printf("Signature verification passed.")
-	} else {
-		// No signature provided by backend.
-		// If we are in production (we have a real embedded key), we MUST reject unsigned updates to prevent MITM bypass!
-		if AgentPublicKeyBase64 != "1111111111111111111111111111111111111111111=" {
-			c.reportUpdateFailure(pipelineId, stepId, "SECURITY ALERT: This agent is in strict production mode and requires a cryptographically signed update. No signature was provided. Update aborted.")
-			return
-		}
-		log.Printf("Warning: Skipping signature verification (dev mode active, no signature provided)")
+	log.Printf("Verifying binary signature...")
+	binaryData, err := os.ReadFile(tempPath)
+	if err != nil {
+		c.reportUpdateFailure(pipelineId, stepId, fmt.Sprintf("Failed to read downloaded binary for verification: %v", err))
+		return
 	}
+
+	if !ed25519.Verify(pubKey, binaryData, sigBytes) {
+		c.reportUpdateFailure(pipelineId, stepId, "SECURITY ALERT: Signature verification failed. The update payload may have been tampered with.")
+		return
+	}
+	log.Printf("Signature verification passed.")
 
 	// Make it executable
 	err = os.Chmod(tempPath, 0755)

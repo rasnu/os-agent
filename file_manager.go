@@ -13,10 +13,26 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"time"
 )
+
+func getInt(m map[string]interface{}, key string) int {
+	if v, ok := m[key].(int); ok {
+		return v
+	}
+	if v, ok := m[key].(float64); ok {
+		return int(v)
+	}
+	if v, ok := m[key].(string); ok {
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
+		}
+	}
+	return 0
+}
 
 func (c *PusherClient) handleFileCommand(action string, args map[string]interface{}) {
 	pipelineId := getString(args, "pipeline_id")
@@ -293,6 +309,140 @@ func (c *PusherClient) handleFileCommand(action string, args map[string]interfac
 				})
 			}
 			data = fileList
+		}
+	case "create-directory":
+		modeStr := getString(args, "mode")
+		var mode os.FileMode = 0755
+		if modeStr != "" {
+			if parsed, err := strconv.ParseUint(modeStr, 8, 32); err == nil {
+				mode = os.FileMode(parsed)
+			}
+		}
+		err := os.MkdirAll(path, mode)
+		if err != nil {
+			success = false
+			logMsg = fmt.Sprintf("Failed to create directory: %v", err)
+		} else {
+			success = true
+			logMsg = "Directory created successfully"
+		}
+	case "rename-path":
+		newPath := getString(args, "new_path")
+		if newPath == "" {
+			newPath = getString(args, "destination")
+		}
+		if newPath == "" {
+			success = false
+			logMsg = "new_path or destination is required"
+			break
+		}
+		if !filepath.IsAbs(newPath) {
+			success = false
+			logMsg = "new_path must be an absolute path"
+			break
+		}
+		newPath = filepath.Clean(newPath)
+		err := os.Rename(path, newPath)
+		if err != nil {
+			success = false
+			logMsg = fmt.Sprintf("Failed to rename path: %v", err)
+		} else {
+			success = true
+			logMsg = "Path renamed successfully"
+		}
+	case "delete-path":
+		cleanPath := filepath.Clean(path)
+		if cleanPath == "/" || cleanPath == filepath.VolumeName(cleanPath)+"\\" {
+			success = false
+			logMsg = "Refusing to delete root directory"
+			break
+		}
+		err := os.RemoveAll(cleanPath)
+		if err != nil {
+			success = false
+			logMsg = fmt.Sprintf("Failed to delete path: %v", err)
+		} else {
+			success = true
+			logMsg = "Path deleted successfully"
+		}
+	case "chmod-path":
+		modeStr := getString(args, "mode")
+		if modeStr == "" {
+			success = false
+			logMsg = "mode is required for chmod"
+			break
+		}
+		parsed, err := strconv.ParseUint(modeStr, 8, 32)
+		if err != nil {
+			success = false
+			logMsg = fmt.Sprintf("Invalid mode %q: must be octal (e.g. 0755)", modeStr)
+			break
+		}
+		recursive := getBool(args, "recursive")
+		if recursive {
+			err = filepath.Walk(path, func(p string, info os.FileInfo, walkErr error) error {
+				if walkErr != nil {
+					return walkErr
+				}
+				return os.Chmod(p, os.FileMode(parsed))
+			})
+		} else {
+			err = os.Chmod(path, os.FileMode(parsed))
+		}
+		if err != nil {
+			success = false
+			logMsg = fmt.Sprintf("Failed to chmod path: %v", err)
+		} else {
+			success = true
+			logMsg = "Path permissions updated successfully"
+		}
+	case "chown-path":
+		uid := getInt(args, "uid")
+		gid := getInt(args, "gid")
+		owner := getString(args, "owner")
+		if owner != "" {
+			if u, err := user.Lookup(owner); err == nil {
+				if parsedUID, err := strconv.Atoi(u.Uid); err == nil {
+					uid = parsedUID
+				}
+				if parsedGID, err := strconv.Atoi(u.Gid); err == nil && gid == 0 {
+					gid = parsedGID
+				}
+			}
+		}
+		group := getString(args, "group")
+		if group != "" {
+			if g, err := user.LookupGroup(group); err == nil {
+				if parsedGID, err := strconv.Atoi(g.Gid); err == nil {
+					gid = parsedGID
+				}
+			}
+		}
+
+		recursive := getBool(args, "recursive")
+		if recursive {
+			err := filepath.Walk(path, func(p string, info os.FileInfo, walkErr error) error {
+				if walkErr != nil {
+					return walkErr
+				}
+				return os.Chown(p, uid, gid)
+			})
+			if err != nil {
+				success = false
+				logMsg = fmt.Sprintf("Failed to chown path recursively: %v", err)
+			} else {
+				success = true
+				logMsg = "Path owner updated successfully"
+			}
+		} else {
+			err := os.Chown(path, uid, gid)
+			if err != nil {
+				success = false
+				logMsg = fmt.Sprintf("Failed to chown path: %v", err)
+			} else {
+				success = true
+				logMsg = "Path owner updated successfully"
+			}
 		}
 	default:
 		success = false

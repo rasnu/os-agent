@@ -153,8 +153,104 @@ func TestStreamBatcher_Flush(t *testing.T) {
 
 	batcher.Write("chunk3\n")
 	batcher.Close()
+	client.wg.Wait()
 
 	if logBuf.String() != "chunk1\nchunk2\nchunk3\n" {
 		t.Errorf("Expected full log buffer, got %q", logBuf.String())
+	}
+}
+
+func TestExecuteRawCommand_GuardrailBlock(t *testing.T) {
+	originalClient := defaultHTTPClient
+	var capturedBody string
+	mockHTTP := &MockHTTPClient{
+		Responses: []*http.Response{
+			{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"status":"ok"}`)),
+			},
+		},
+		OnRequest: func(req *http.Request) {
+			b, _ := io.ReadAll(req.Body)
+			capturedBody = string(b)
+		},
+	}
+	defaultHTTPClient = mockHTTP
+	defer func() { defaultHTTPClient = originalClient }()
+
+	shellExecuted := false
+	originalAdapter := os_adapter.Current()
+	mockAdapter := &MockOSAdapter{
+		GetShellCmdFunc: func(ctx context.Context, script string, runAsUser string) *exec.Cmd {
+			shellExecuted = true
+			return exec.CommandContext(ctx, "echo", "should not run")
+		},
+	}
+	os_adapter.SetAdapter(mockAdapter)
+	defer os_adapter.SetAdapter(originalAdapter)
+
+	client := &PusherClient{
+		ApiURL: "http://test",
+		Token:  "test-token",
+	}
+
+	client.executeRawCommand("req-destructive", "rm -rf /", "")
+
+	if shellExecuted {
+		t.Errorf("Expected shell command NOT to execute for destructive command rm -rf /")
+	}
+	if !bytes.Contains([]byte(capturedBody), []byte(`"success":false`)) {
+		t.Errorf("Expected success:false in completion request, got: %s", capturedBody)
+	}
+	if !bytes.Contains([]byte(capturedBody), []byte(`GUARDRAIL BLOCK`)) {
+		t.Errorf("Expected log to mention 'GUARDRAIL BLOCK', got: %s", capturedBody)
+	}
+}
+
+func TestExecuteAndStream_GuardrailBlock(t *testing.T) {
+	originalClient := defaultHTTPClient
+	var capturedBody string
+	mockHTTP := &MockHTTPClient{
+		Responses: []*http.Response{
+			{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"status":"ok"}`)),
+			},
+		},
+		OnRequest: func(req *http.Request) {
+			b, _ := io.ReadAll(req.Body)
+			capturedBody = string(b)
+		},
+	}
+	defaultHTTPClient = mockHTTP
+	defer func() { defaultHTTPClient = originalClient }()
+
+	shellExecuted := false
+	originalAdapter := os_adapter.Current()
+	mockAdapter := &MockOSAdapter{
+		GetShellCmdFunc: func(ctx context.Context, script string, runAsUser string) *exec.Cmd {
+			shellExecuted = true
+			return exec.CommandContext(ctx, "echo", "should not run")
+		},
+	}
+	os_adapter.SetAdapter(mockAdapter)
+	defer os_adapter.SetAdapter(originalAdapter)
+
+	client := &PusherClient{
+		ApiURL: "http://test",
+		Token:  "test-token",
+		closed: true, // prevent WebSocket streaming attempts
+	}
+
+	client.executeAndStream("pipe-1", "step-destructive", "rm -rf /*", "", 60)
+
+	if shellExecuted {
+		t.Errorf("Expected shell command NOT to execute for destructive command rm -rf /*")
+	}
+	if !bytes.Contains([]byte(capturedBody), []byte(`"success":false`)) {
+		t.Errorf("Expected success:false in completion request, got: %s", capturedBody)
+	}
+	if !bytes.Contains([]byte(capturedBody), []byte(`GUARDRAIL BLOCK`)) {
+		t.Errorf("Expected log to mention 'GUARDRAIL BLOCK', got: %s", capturedBody)
 	}
 }

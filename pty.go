@@ -83,7 +83,27 @@ func CleanupIdleSessions(shutdownChan chan struct{}) {
 	}
 }
 
+const maxConcurrentSessions = 5
+
+func isValidTermID(termID string) bool {
+	if len(termID) == 0 || len(termID) > 64 {
+		return false
+	}
+	for _, r := range termID {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 func (c *PusherClient) StartTerminal(termID string, isAgentOwned bool, requestID string) *PTYSession {
+	if !isValidTermID(termID) {
+		log.Printf("Terminal session rejected: invalid term_id %q", termID)
+		logAuditEvent(AuditEvent{Action: "pty_session_start", Command: termID, Success: false, Error: "invalid_term_id"})
+		return nil
+	}
+
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 
@@ -111,9 +131,16 @@ func (c *PusherClient) StartTerminal(termID string, isAgentOwned bool, requestID
 		}
 	}
 
+	if len(activeSessions) >= maxConcurrentSessions {
+		log.Printf("Terminal session rejected: maximum concurrent sessions (%d) reached", maxConcurrentSessions)
+		logAuditEvent(AuditEvent{Action: "pty_session_start", Command: termID, Success: false, Error: "max_concurrent_sessions_exceeded"})
+		return nil
+	}
+
 	ptyInstance, err := os_adapter.Current().StartPTY(80, 24)
 	if err != nil {
 		log.Printf("Failed to start pty: %v", err)
+		logAuditEvent(AuditEvent{Action: "pty_session_start", Command: termID, Success: false, Error: err.Error()})
 		return nil
 	}
 
@@ -128,6 +155,7 @@ func (c *PusherClient) StartTerminal(termID string, isAgentOwned bool, requestID
 	}
 
 	activeSessions[termID] = session
+	logAuditEvent(AuditEvent{Action: "pty_session_start", Command: termID, Success: true})
 
 	c.wg.Add(1)
 	go func() {
@@ -273,6 +301,7 @@ func (s *PTYSession) Close() {
 	if _, exists := activeSessions[s.termID]; exists {
 		log.Printf("Closing terminal session %s", s.termID)
 		delete(activeSessions, s.termID)
+		logAuditEvent(AuditEvent{Action: "pty_session_close", Command: s.termID, Success: true})
 	}
 	sessionMutex.Unlock()
 

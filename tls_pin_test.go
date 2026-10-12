@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"testing"
+	"time"
 )
 
 func TestSecureTLSConfig(t *testing.T) {
@@ -61,6 +62,23 @@ func TestSecureTLSConfig(t *testing.T) {
 }
 
 func TestApplyTLSPinToDefaultTransport(t *testing.T) {
+	origDefault := defaultHTTPClient
+	origHeartbeat := heartbeatHTTPClient
+	origUpdater := updaterHTTPClient
+	origFileTransfer := fileTransferHTTPClient
+	defer func() {
+		defaultHTTPClient = origDefault
+		heartbeatHTTPClient = origHeartbeat
+		updaterHTTPClient = origUpdater
+		fileTransferHTTPClient = origFileTransfer
+		SetGlobalTLSConfig(nil)
+	}()
+
+	defaultHTTPClient = &http.Client{Timeout: 30 * time.Second, Transport: defaultTransport()}
+	heartbeatHTTPClient = &http.Client{Timeout: 30 * time.Second, Transport: defaultTransport()}
+	updaterHTTPClient = &http.Client{Timeout: 240 * time.Second, Transport: defaultTransport()}
+	fileTransferHTTPClient = &http.Client{Timeout: 0, Transport: defaultTransport()}
+
 	applyTLSPinToDefaultTransport("dummy_pin")
 	
 	transport, ok := http.DefaultTransport.(*http.Transport)
@@ -69,10 +87,60 @@ func TestApplyTLSPinToDefaultTransport(t *testing.T) {
 	}
 	
 	if transport.TLSClientConfig == nil {
-		t.Fatalf("TLSClientConfig was not set")
+		t.Fatalf("TLSClientConfig was not set on http.DefaultTransport")
 	}
 	
 	if transport.TLSClientConfig.InsecureSkipVerify {
-		t.Errorf("InsecureSkipVerify should be false")
+		t.Errorf("InsecureSkipVerify should be false on http.DefaultTransport")
+	}
+
+	// Verify all global agent HTTP clients have the pinned TLS configuration
+	clients := map[string]HTTPDoer{
+		"defaultHTTPClient":      defaultHTTPClient,
+		"heartbeatHTTPClient":    heartbeatHTTPClient,
+		"updaterHTTPClient":      updaterHTTPClient,
+		"fileTransferHTTPClient": fileTransferHTTPClient,
+	}
+
+	for name, doer := range clients {
+		client, ok := doer.(*http.Client)
+		if !ok || client == nil {
+			t.Fatalf("%s is not an *http.Client", name)
+		}
+
+		rt, ok := client.Transport.(*userAgentRoundTripper)
+		if !ok || rt == nil {
+			t.Fatalf("%s does not wrap userAgentRoundTripper", name)
+		}
+
+		innerTransport, ok := rt.inner.(*http.Transport)
+		if !ok || innerTransport == nil {
+			t.Fatalf("%s inner transport is not *http.Transport", name)
+		}
+
+		if innerTransport.TLSClientConfig == nil {
+			t.Errorf("%s has nil TLSClientConfig", name)
+		} else {
+			if innerTransport.TLSClientConfig.InsecureSkipVerify {
+				t.Errorf("%s has InsecureSkipVerify=true, expected false", name)
+			}
+			if innerTransport.TLSClientConfig.VerifyConnection == nil {
+				t.Errorf("%s has nil VerifyConnection", name)
+			}
+		}
+	}
+
+	// Verify a newly created transport also inherits the pinned TLS configuration
+	newTransport := defaultTransport()
+	newRT, ok := newTransport.(*userAgentRoundTripper)
+	if !ok || newRT == nil {
+		t.Fatalf("newly created transport does not wrap userAgentRoundTripper")
+	}
+	newInner, ok := newRT.inner.(*http.Transport)
+	if !ok || newInner == nil {
+		t.Fatalf("newly created transport inner is not *http.Transport")
+	}
+	if newInner.TLSClientConfig == nil {
+		t.Errorf("newly created transport has nil TLSClientConfig")
 	}
 }

@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -21,8 +23,53 @@ func (rt *userAgentRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	return rt.inner.RoundTrip(req)
 }
 
+var (
+	globalTLSConfig   *tls.Config
+	globalTLSConfigMu sync.RWMutex
+)
+
+// SetGlobalTLSConfig applies the given TLS configuration across all agent HTTP clients and future transports.
+func SetGlobalTLSConfig(cfg *tls.Config) {
+	globalTLSConfigMu.Lock()
+	defer globalTLSConfigMu.Unlock()
+	globalTLSConfig = cfg
+
+	applyToClient := func(doer HTTPDoer) {
+		if client, ok := doer.(*http.Client); ok && client != nil {
+			if client.Transport == nil {
+				client.Transport = defaultTransport()
+			}
+			if rt, ok := client.Transport.(*userAgentRoundTripper); ok && rt != nil {
+				if t, ok := rt.inner.(*http.Transport); ok && t != nil {
+					t.TLSClientConfig = cfg
+					return
+				}
+			}
+			if t, ok := client.Transport.(*http.Transport); ok && t != nil {
+				t.TLSClientConfig = cfg
+				return
+			}
+		}
+	}
+
+	applyToClient(defaultHTTPClient)
+	applyToClient(heartbeatHTTPClient)
+	applyToClient(updaterHTTPClient)
+	applyToClient(fileTransferHTTPClient)
+}
+
+func getGlobalTLSConfig() *tls.Config {
+	globalTLSConfigMu.RLock()
+	defer globalTLSConfigMu.RUnlock()
+	return globalTLSConfig
+}
+
 func defaultTransport() http.RoundTripper {
 	baseTransport := http.DefaultTransport.(*http.Transport).Clone()
+
+	if cfg := getGlobalTLSConfig(); cfg != nil {
+		baseTransport.TLSClientConfig = cfg
+	}
 	
 	// Force IPv4 for all agent outgoing requests to avoid broken IPv6 routes on customer VPSs
 	// which commonly cause 10s timeouts when dialing Cloudflare AAAA records.

@@ -9,6 +9,13 @@ import (
 )
 
 func TestCollectAndSendMetrics(t *testing.T) {
+	origDefault := defaultHTTPClient
+	origHeartbeat := heartbeatHTTPClient
+	defer func() {
+		defaultHTTPClient = origDefault
+		heartbeatHTTPClient = origHeartbeat
+	}()
+
 	mockHTTP := &MockHTTPClient{}
 	defaultHTTPClient = mockHTTP
 	heartbeatHTTPClient = mockHTTP
@@ -20,17 +27,18 @@ func TestCollectAndSendMetrics(t *testing.T) {
 
 	// Wait for the async flush goroutine (up to 1 second)
 	for i := 0; i < 10; i++ {
-		if mockHTTP.CallCount > 0 {
+		if mockHTTP.GetCallCount() > 0 {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	if mockHTTP.CallCount == 0 {
+	if mockHTTP.GetCallCount() == 0 {
 		t.Fatalf("expected HTTP call for metrics")
 	}
 
-	req := mockHTTP.Requests[0]
+	reqs := mockHTTP.GetRequests()
+	req := reqs[0]
 	if !strings.Contains(req.URL.String(), "/agent/metrics") {
 		t.Errorf("wrong URL: %v", req.URL)
 	}

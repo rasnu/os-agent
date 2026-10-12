@@ -147,3 +147,73 @@ func TestStreamTerminalOutput(t *testing.T) {
 	client := NewPusherClient("ws://fake", "http://fake", "token", "server1", "")
 	client.streamTerminalOutput("term1", "hello world")
 }
+
+func TestIsValidTermID(t *testing.T) {
+	valid := []string{"term-1", "term_2", "123", "a-B_c-9"}
+	for _, id := range valid {
+		if !isValidTermID(id) {
+			t.Errorf("Expected %q to be valid term ID", id)
+		}
+	}
+
+	invalid := []string{
+		"",
+		"term with spaces",
+		"term/with/slashes",
+		"../escape",
+		"term;drop",
+		"term$eval",
+		"this-term-id-is-way-too-long-and-exceeds-the-maximum-sixty-four-characters-allowed-by-agent-guardrails",
+	}
+	for _, id := range invalid {
+		if isValidTermID(id) {
+			t.Errorf("Expected %q to be rejected as invalid term ID", id)
+		}
+	}
+}
+
+func TestStartTerminal_LimitsAndValidation(t *testing.T) {
+	mockAdapter := &MockOSAdapter{
+		StartPTYFunc: func(cols, rows uint16) (os_adapter.PTY, error) {
+			return &MockPTY{}, nil
+		},
+	}
+	os_adapter.SetAdapter(mockAdapter)
+
+	client := &PusherClient{ServerID: "test-server"}
+
+	// 1. Invalid term ID must be rejected
+	if sess := client.StartTerminal("../bad-id", false, ""); sess != nil {
+		t.Errorf("Expected StartTerminal to return nil for traversal termID")
+	}
+
+	// Clean up any active sessions first
+	sessionMutex.Lock()
+	for k := range activeSessions {
+		delete(activeSessions, k)
+	}
+	sessionMutex.Unlock()
+
+	// 2. Fill sessions up to maxConcurrentSessions
+	sessions := make([]*PTYSession, 0, maxConcurrentSessions)
+	for i := 0; i < maxConcurrentSessions; i++ {
+		termID := "test-session-" + string(rune('a'+i))
+		sess := client.StartTerminal(termID, false, "")
+		if sess == nil {
+			t.Fatalf("Failed to start session %d", i)
+		}
+		sessions = append(sessions, sess)
+	}
+
+	// 3. Attempting to start one more session must be rejected
+	excess := client.StartTerminal("test-session-overflow", false, "")
+	if excess != nil {
+		t.Errorf("Expected session creation beyond limit to be rejected")
+	}
+
+	// Clean up
+	for _, s := range sessions {
+		s.Close()
+	}
+}
+

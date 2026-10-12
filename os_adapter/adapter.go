@@ -3,6 +3,7 @@ package os_adapter
 import (
 	"context"
 	"os/exec"
+	"sync"
 )
 
 type Process struct {
@@ -75,9 +76,14 @@ type OSAdapter interface {
 	GetMachineID() string
 }
 
-var currentAdapter OSAdapter
+var (
+	adapterMutex   sync.RWMutex
+	currentAdapter OSAdapter
+)
 
 func Current() OSAdapter {
+	adapterMutex.RLock()
+	defer adapterMutex.RUnlock()
 	if currentAdapter == nil {
 		panic("OSAdapter is not initialized. Ensure an OS-specific init() is called.")
 	}
@@ -85,5 +91,7 @@ func Current() OSAdapter {
 }
 
 func SetAdapter(a OSAdapter) {
+	adapterMutex.Lock()
+	defer adapterMutex.Unlock()
 	currentAdapter = a
 }

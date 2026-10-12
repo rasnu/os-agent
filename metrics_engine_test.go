@@ -6,6 +6,13 @@ import (
 )
 
 func TestStartMetricsEngine(t *testing.T) {
+	origDefault := defaultHTTPClient
+	origHeartbeat := heartbeatHTTPClient
+	defer func() {
+		defaultHTTPClient = origDefault
+		heartbeatHTTPClient = origHeartbeat
+	}()
+
 	mockHTTP := &MockHTTPClient{}
 	defaultHTTPClient = mockHTTP
 	heartbeatHTTPClient = mockHTTP
@@ -13,16 +20,18 @@ func TestStartMetricsEngine(t *testing.T) {
 	client := NewPusherClient("ws://", "http://localhost/api", "token", "srv", "")
 
 	shutdownChan := make(chan struct{})
+	done := make(chan struct{})
 
-	metricsTickerDuration = 1 * time.Millisecond
-	defer func() { metricsTickerDuration = 15 * time.Second }()
-	// Start engine in background
-	go client.StartMetricsEngine(shutdownChan)
+	go func() {
+		client.StartMetricsEngine(shutdownChan)
+		close(done)
+	}()
 
-	// Wait 100ms and shut it down
-	time.Sleep(100 * time.Millisecond)
 	close(shutdownChan)
 
-	// We can't assert mockHTTP.CallCount because the ticker is 60 seconds
-	// But this gives us 100% coverage on the shutdown branch of the select statement!
+	select {
+	case <-done:
+	case <-time.After(1 * time.Second):
+		t.Fatal("StartMetricsEngine did not exit on shutdown")
+	}
 }

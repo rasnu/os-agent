@@ -53,20 +53,25 @@ func TestPusherClient_ConnectAndSubscribe(t *testing.T) {
 	// We replace heartbeat client to hit local server without custom HTTPDoer mocks
 	// because we pass the URL directly.
 
+	origDefault := defaultHTTPClient
+	origHeartbeat := heartbeatHTTPClient
+	defer func() {
+		defaultHTTPClient = origDefault
+		heartbeatHTTPClient = origHeartbeat
+	}()
+
+	defaultHTTPClient = &http.Client{}
+	heartbeatHTTPClient = &http.Client{}
+
 	err := client.Connect()
 	if err != nil {
 		t.Fatalf("Connect failed: %v", err)
 	}
-
-	// Mock heartbeat client so we can test the unmocked path?
-	// The HTTPDoer was already injected in previous step, so we need to bypass it or use it.
-	// Actually we can just restore defaultHTTPClient to standard http.Client for this test
-	defaultHTTPClient = &http.Client{}
-	heartbeatHTTPClient = &http.Client{}
 
 	client.authenticateChannel("123", "test")
 	client.sendHeartbeat()
 	client.subscribe("123")
 
 	client.Close()
+	<-client.done
 }

@@ -220,4 +220,102 @@ func TestHandleFileCommand(t *testing.T) {
 	if success, ok := lastReqBody["success"].(bool); !ok || success {
 		t.Fatalf("Expected upload without URL to fail")
 	}
+
+	// 14. Test create-directory
+	newDirPath := filepath.Join(tempDir, "subdir", "nested")
+	createDirArgs := map[string]interface{}{
+		"pipeline_id": "pipe-1",
+		"step_id":     "step-mkdir",
+		"path":        newDirPath,
+		"mode":        "0750",
+	}
+	client.handleFileCommand("create-directory", createDirArgs)
+	client.wg.Wait()
+	if success, ok := lastReqBody["success"].(bool); !ok || !success {
+		t.Fatalf("create-directory failed: %v", lastReqBody["log"])
+	}
+	dirStat, err := os.Stat(newDirPath)
+	if err != nil || !dirStat.IsDir() {
+		t.Fatalf("Expected directory to exist at %s", newDirPath)
+	}
+
+	// 15. Test rename-path
+	renamedPath := filepath.Join(tempDir, "subdir", "renamed_nested")
+	renameArgs := map[string]interface{}{
+		"pipeline_id": "pipe-1",
+		"step_id":     "step-rename",
+		"path":        newDirPath,
+		"new_path":    renamedPath,
+	}
+	client.handleFileCommand("rename-path", renameArgs)
+	client.wg.Wait()
+	if success, ok := lastReqBody["success"].(bool); !ok || !success {
+		t.Fatalf("rename-path failed: %v", lastReqBody["log"])
+	}
+	if _, err := os.Stat(newDirPath); !os.IsNotExist(err) {
+		t.Errorf("Expected old path to not exist after rename")
+	}
+	if _, err := os.Stat(renamedPath); err != nil {
+		t.Errorf("Expected new path to exist after rename")
+	}
+
+	// 16. Test chmod-path
+	targetFile := filepath.Join(renamedPath, "chmod_target.txt")
+	os.WriteFile(targetFile, []byte("chmod test"), 0644)
+	chmodArgs := map[string]interface{}{
+		"pipeline_id": "pipe-1",
+		"step_id":     "step-chmod",
+		"path":        targetFile,
+		"mode":        "0600",
+	}
+	client.handleFileCommand("chmod-path", chmodArgs)
+	client.wg.Wait()
+	if success, ok := lastReqBody["success"].(bool); !ok || !success {
+		t.Fatalf("chmod-path failed: %v", lastReqBody["log"])
+	}
+	fileStat, _ := os.Stat(targetFile)
+	if fileStat.Mode().Perm() != 0600 {
+		t.Errorf("chmod-path mode mismatch: got %04o, expected 0600", fileStat.Mode().Perm())
+	}
+
+	// 17. Test chown-path
+	chownArgs := map[string]interface{}{
+		"pipeline_id": "pipe-1",
+		"step_id":     "step-chown",
+		"path":        targetFile,
+		"uid":         os.Getuid(),
+		"gid":         os.Getgid(),
+	}
+	client.handleFileCommand("chown-path", chownArgs)
+	client.wg.Wait()
+	if success, ok := lastReqBody["success"].(bool); !ok || !success {
+		t.Fatalf("chown-path failed: %v", lastReqBody["log"])
+	}
+
+	// 18. Test delete-path safety guardrail (refuse root)
+	deleteRootArgs := map[string]interface{}{
+		"pipeline_id": "pipe-1",
+		"step_id":     "step-del-root",
+		"path":        "/",
+	}
+	client.handleFileCommand("delete-path", deleteRootArgs)
+	client.wg.Wait()
+	if success, ok := lastReqBody["success"].(bool); !ok || success {
+		t.Fatalf("Expected delete-path on / to be rejected by safety guardrail")
+	}
+
+	// 19. Test delete-path regular recursive directory deletion
+	deleteDirArgs := map[string]interface{}{
+		"pipeline_id": "pipe-1",
+		"step_id":     "step-del-dir",
+		"path":        filepath.Join(tempDir, "subdir"),
+	}
+	client.handleFileCommand("delete-path", deleteDirArgs)
+	client.wg.Wait()
+	if success, ok := lastReqBody["success"].(bool); !ok || !success {
+		t.Fatalf("delete-path failed: %v", lastReqBody["log"])
+	}
+	if _, err := os.Stat(filepath.Join(tempDir, "subdir")); !os.IsNotExist(err) {
+		t.Errorf("Expected deleted directory to not exist")
+	}
 }

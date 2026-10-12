@@ -261,7 +261,7 @@ func (c *PusherClient) checkAlerts(metrics os_adapter.Metrics) {
 		// 15-minute cooldown for all alerts to prevent spam
 		if time.Since(globalAlertMonitor.lastAlertTime) >= 15*time.Minute {
 			globalAlertMonitor.lastAlertTime = time.Now()
-			go c.sendSystemAlert(alertPayload)
+			c.sendSystemAlert(alertPayload)
 		} else {
 			log.Printf("Alert Triggered (%s) but suppressed due to 15-minute cooldown.", alertPayload.Type)
 		}

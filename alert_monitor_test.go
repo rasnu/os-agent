@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,10 +14,13 @@ import (
 
 // MockAlertHTTPClient intercepts the heartbeatHTTPClient calls
 type MockAlertHTTPClient struct {
+	mu   sync.Mutex
 	Reqs []*http.Request
 }
 
 func (m *MockAlertHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.Reqs = append(m.Reqs, req)
 	return &http.Response{
 		StatusCode: 200,
