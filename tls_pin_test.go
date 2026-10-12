@@ -62,19 +62,19 @@ func TestSecureTLSConfig(t *testing.T) {
 }
 
 func TestApplyTLSPinToDefaultTransport(t *testing.T) {
-	origDefault := defaultHTTPClient
+	origDefault := getDefaultHTTPClient()
 	origHeartbeat := heartbeatHTTPClient
 	origUpdater := updaterHTTPClient
 	origFileTransfer := fileTransferHTTPClient
 	defer func() {
-		defaultHTTPClient = origDefault
+		setDefaultHTTPClient(origDefault)
 		heartbeatHTTPClient = origHeartbeat
 		updaterHTTPClient = origUpdater
 		fileTransferHTTPClient = origFileTransfer
 		SetGlobalTLSConfig(nil)
 	}()
 
-	defaultHTTPClient = &http.Client{Timeout: 30 * time.Second, Transport: defaultTransport()}
+	setDefaultHTTPClient(&http.Client{Timeout: 30 * time.Second, Transport: defaultTransport()})
 	heartbeatHTTPClient = &http.Client{Timeout: 30 * time.Second, Transport: defaultTransport()}
 	updaterHTTPClient = &http.Client{Timeout: 240 * time.Second, Transport: defaultTransport()}
 	fileTransferHTTPClient = &http.Client{Timeout: 0, Transport: defaultTransport()}
@@ -96,7 +96,7 @@ func TestApplyTLSPinToDefaultTransport(t *testing.T) {
 
 	// Verify all global agent HTTP clients have the pinned TLS configuration
 	clients := map[string]HTTPDoer{
-		"defaultHTTPClient":      defaultHTTPClient,
+		"defaultHTTPClient":      getDefaultHTTPClient(),
 		"heartbeatHTTPClient":    heartbeatHTTPClient,
 		"updaterHTTPClient":      updaterHTTPClient,
 		"fileTransferHTTPClient": fileTransferHTTPClient,

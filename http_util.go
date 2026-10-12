@@ -52,6 +52,8 @@ func SetGlobalTLSConfig(cfg *tls.Config) {
 		}
 	}
 
+	httpClientMu.Lock()
+	defer httpClientMu.Unlock()
 	applyToClient(defaultHTTPClient)
 	applyToClient(heartbeatHTTPClient)
 	applyToClient(updaterHTTPClient)
@@ -91,8 +93,22 @@ func defaultTransport() http.RoundTripper {
 }
 
 var (
+	httpClientMu           sync.RWMutex
 	defaultHTTPClient      HTTPDoer = &http.Client{Timeout: 30 * time.Second, Transport: defaultTransport()}
 	heartbeatHTTPClient    HTTPDoer = &http.Client{Timeout: 30 * time.Second, Transport: defaultTransport()}
 	updaterHTTPClient      HTTPDoer = &http.Client{Timeout: 240 * time.Second, Transport: defaultTransport()}
 	fileTransferHTTPClient HTTPDoer = &http.Client{Timeout: 0, Transport: defaultTransport()}
 )
+
+func getDefaultHTTPClient() HTTPDoer {
+	httpClientMu.RLock()
+	defer httpClientMu.RUnlock()
+	return defaultHTTPClient
+}
+
+func setDefaultHTTPClient(client HTTPDoer) {
+	httpClientMu.Lock()
+	defer httpClientMu.Unlock()
+	defaultHTTPClient = client
+}
+

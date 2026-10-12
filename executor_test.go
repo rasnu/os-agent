@@ -13,7 +13,7 @@ import (
 )
 
 func TestExecuteRawCommand(t *testing.T) {
-	originalClient := defaultHTTPClient
+	originalClient := getDefaultHTTPClient()
 	mockHTTP := &MockHTTPClient{
 		Responses: []*http.Response{
 			{
@@ -22,8 +22,8 @@ func TestExecuteRawCommand(t *testing.T) {
 			},
 		},
 	}
-	defaultHTTPClient = mockHTTP
-	defer func() { defaultHTTPClient = originalClient }()
+	setDefaultHTTPClient(mockHTTP)
+	defer func() { setDefaultHTTPClient(originalClient) }()
 
 	originalAdapter := os_adapter.Current()
 	mockAdapter := &MockOSAdapter{
@@ -41,7 +41,7 @@ func TestExecuteRawCommand(t *testing.T) {
 }
 
 func TestExecuteRawCommand_Timeout(t *testing.T) {
-	originalClient := defaultHTTPClient
+	originalClient := getDefaultHTTPClient()
 
 	// We want to capture the request to see the final completion status
 	var capturedBody string
@@ -57,8 +57,8 @@ func TestExecuteRawCommand_Timeout(t *testing.T) {
 			capturedBody = string(b)
 		},
 	}
-	defaultHTTPClient = mockHTTP
-	defer func() { defaultHTTPClient = originalClient }()
+	setDefaultHTTPClient(mockHTTP)
+	defer func() { setDefaultHTTPClient(originalClient) }()
 
 	originalAdapter := os_adapter.Current()
 	mockAdapter := &MockOSAdapter{
@@ -93,7 +93,7 @@ func TestExecuteRawCommand_Timeout(t *testing.T) {
 }
 
 func TestExecuteDiscovery(t *testing.T) {
-	originalClient := defaultHTTPClient
+	originalClient := getDefaultHTTPClient()
 	mockHTTP := &MockHTTPClient{
 		Responses: []*http.Response{
 			{
@@ -102,8 +102,8 @@ func TestExecuteDiscovery(t *testing.T) {
 			},
 		},
 	}
-	defaultHTTPClient = mockHTTP
-	defer func() { defaultHTTPClient = originalClient }()
+	setDefaultHTTPClient(mockHTTP)
+	defer func() { setDefaultHTTPClient(originalClient) }()
 
 	originalAdapter := os_adapter.Current()
 	mockAdapter := &MockOSAdapter{
@@ -122,7 +122,7 @@ func TestExecuteDiscovery(t *testing.T) {
 }
 
 func TestStreamBatcher_Flush(t *testing.T) {
-	originalClient := defaultHTTPClient
+	originalClient := getDefaultHTTPClient()
 	mockHTTP := &MockHTTPClient{
 		Responses: []*http.Response{
 			{
@@ -131,8 +131,8 @@ func TestStreamBatcher_Flush(t *testing.T) {
 			},
 		},
 	}
-	defaultHTTPClient = mockHTTP
-	defer func() { defaultHTTPClient = originalClient }()
+	setDefaultHTTPClient(mockHTTP)
+	defer func() { setDefaultHTTPClient(originalClient) }()
 
 	client := &PusherClient{
 		ServerID: "test-server",
@@ -161,7 +161,7 @@ func TestStreamBatcher_Flush(t *testing.T) {
 }
 
 func TestExecuteRawCommand_GuardrailBlock(t *testing.T) {
-	originalClient := defaultHTTPClient
+	originalClient := getDefaultHTTPClient()
 	var capturedBody string
 	mockHTTP := &MockHTTPClient{
 		Responses: []*http.Response{
@@ -175,8 +175,8 @@ func TestExecuteRawCommand_GuardrailBlock(t *testing.T) {
 			capturedBody = string(b)
 		},
 	}
-	defaultHTTPClient = mockHTTP
-	defer func() { defaultHTTPClient = originalClient }()
+	setDefaultHTTPClient(mockHTTP)
+	defer func() { setDefaultHTTPClient(originalClient) }()
 
 	shellExecuted := false
 	originalAdapter := os_adapter.Current()
@@ -208,7 +208,7 @@ func TestExecuteRawCommand_GuardrailBlock(t *testing.T) {
 }
 
 func TestExecuteAndStream_GuardrailBlock(t *testing.T) {
-	originalClient := defaultHTTPClient
+	originalClient := getDefaultHTTPClient()
 	var capturedBody string
 	mockHTTP := &MockHTTPClient{
 		Responses: []*http.Response{
@@ -222,8 +222,8 @@ func TestExecuteAndStream_GuardrailBlock(t *testing.T) {
 			capturedBody = string(b)
 		},
 	}
-	defaultHTTPClient = mockHTTP
-	defer func() { defaultHTTPClient = originalClient }()
+	setDefaultHTTPClient(mockHTTP)
+	defer func() { setDefaultHTTPClient(originalClient) }()
 
 	shellExecuted := false
 	originalAdapter := os_adapter.Current()

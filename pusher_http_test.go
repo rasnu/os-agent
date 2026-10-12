@@ -34,7 +34,7 @@ func TestPusherClient_SendHeartbeat(t *testing.T) {
 }
 
 func TestPusherClient_AuthenticateChannel(t *testing.T) {
-	originalClient := defaultHTTPClient
+	originalClient := getDefaultHTTPClient()
 	mockHTTP := &MockHTTPClient{
 		Responses: []*http.Response{
 			{
@@ -43,8 +43,8 @@ func TestPusherClient_AuthenticateChannel(t *testing.T) {
 			},
 		},
 	}
-	defaultHTTPClient = mockHTTP
-	defer func() { defaultHTTPClient = originalClient }()
+	setDefaultHTTPClient(mockHTTP)
+	defer func() { setDefaultHTTPClient(originalClient) }()
 
 	client := &PusherClient{
 		ServerID: "test-server",

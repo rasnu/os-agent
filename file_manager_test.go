@@ -21,9 +21,9 @@ func TestHandleFileCommand(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	originalClient := defaultHTTPClient
-	defaultHTTPClient = ts.Client()
-	defer func() { defaultHTTPClient = originalClient }()
+	originalClient := getDefaultHTTPClient()
+	setDefaultHTTPClient(ts.Client())
+	defer func() { setDefaultHTTPClient(originalClient) }()
 
 	client := &PusherClient{
 		ApiURL: ts.URL,

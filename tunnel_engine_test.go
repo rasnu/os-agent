@@ -52,9 +52,9 @@ func TestTunnelEngine_EndToEnd(t *testing.T) {
 		},
 	}
 
-	originalClient := defaultHTTPClient
-	defaultHTTPClient = mockHTTP
-	defer func() { defaultHTTPClient = originalClient }()
+	originalClient := getDefaultHTTPClient()
+	setDefaultHTTPClient(mockHTTP)
+	defer func() { setDefaultHTTPClient(originalClient) }()
 
 	client := &PusherClient{
 		ApiURL: "http://localhost",

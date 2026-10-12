@@ -485,7 +485,7 @@ func (c *PusherClient) uploadFileStream(url, filePath string) error {
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+c.Token)
 
-	resp, err := defaultHTTPClient.Do(req)
+	resp, err := getDefaultHTTPClient().Do(req)
 	if err != nil {
 		return err
 	}
@@ -523,7 +523,7 @@ func (c *PusherClient) sendFileCompletion(pipelineId string, stepId string, succ
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.Token)
 
-	resp, err := defaultHTTPClient.Do(req)
+	resp, err := getDefaultHTTPClient().Do(req)
 	if err != nil {
 		log.Printf("Error sending file completion: %v", err)
 		return

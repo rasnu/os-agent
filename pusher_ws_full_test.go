@@ -102,4 +102,7 @@ func TestPusherClient_ReadPumpFullEvents(t *testing.T) {
 
 	// This will block until the wsServer closes and the connection drops
 	<-client.done
+	client.CancelAllCommands()
+	client.WaitCommands()
 }
+

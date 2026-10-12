@@ -447,7 +447,7 @@ func (c *PusherClient) sendMigrationCompletion(pipelineId, stepId string, succes
 	req, _ := http.NewRequest("POST", completionURL, bytes.NewBuffer(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.Token)
-	resp, err := defaultHTTPClient.Do(req)
+	resp, err := getDefaultHTTPClient().Do(req)
 	if err != nil {
 		log.Printf("Failed to send migration completion webhook: %v", err)
 		return

@@ -864,7 +864,7 @@ func (c *PusherClient) authenticateChannel(socketID, channelName string) (string
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.Token)
 
-	resp, err := defaultHTTPClient.Do(req)
+	resp, err := getDefaultHTTPClient().Do(req)
 	if err != nil {
 		return "", err
 	}

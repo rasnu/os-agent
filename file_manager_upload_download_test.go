@@ -33,11 +33,11 @@ func TestFileManager_UploadFileToDashboard(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	originalClient := defaultHTTPClient
-	defaultHTTPClient = ts.Client()
+	originalClient := getDefaultHTTPClient()
+	setDefaultHTTPClient(ts.Client())
 	fileTransferHTTPClient = ts.Client()
 	defer func() {
-		defaultHTTPClient = originalClient
+		setDefaultHTTPClient(originalClient)
 		fileTransferHTTPClient = &http.Client{Timeout: 0}
 	}()
 
@@ -85,11 +85,11 @@ func TestFileManager_DownloadFileFromDashboard(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	originalClient := defaultHTTPClient
-	defaultHTTPClient = ts.Client()
+	originalClient := getDefaultHTTPClient()
+	setDefaultHTTPClient(ts.Client())
 	fileTransferHTTPClient = ts.Client()
 	defer func() {
-		defaultHTTPClient = originalClient
+		setDefaultHTTPClient(originalClient)
 		fileTransferHTTPClient = &http.Client{Timeout: 0}
 	}()
 
@@ -141,9 +141,9 @@ func TestFileManager_UploadFileStream(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	originalClient := defaultHTTPClient
-	defaultHTTPClient = ts.Client()
-	defer func() { defaultHTTPClient = originalClient }()
+	originalClient := getDefaultHTTPClient()
+	setDefaultHTTPClient(ts.Client())
+	defer func() { setDefaultHTTPClient(originalClient) }()
 
 	client := &PusherClient{ApiURL: ts.URL, Token: "test"}
 
@@ -178,11 +178,11 @@ func TestDownloadFile_DiskFull(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	originalClient := defaultHTTPClient
-	defaultHTTPClient = ts.Client()
+	originalClient := getDefaultHTTPClient()
+	setDefaultHTTPClient(ts.Client())
 	fileTransferHTTPClient = ts.Client()
 	defer func() {
-		defaultHTTPClient = originalClient
+		setDefaultHTTPClient(originalClient)
 		fileTransferHTTPClient = originalClient
 	}()
 

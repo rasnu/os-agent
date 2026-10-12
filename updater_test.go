@@ -15,7 +15,7 @@ import (
 )
 
 func setupMockHTTP() (*MockHTTPClient, func()) {
-	orig := defaultHTTPClient
+	orig := getDefaultHTTPClient()
 	mock := &MockHTTPClient{
 		Responses: []*http.Response{
 			{
@@ -24,8 +24,8 @@ func setupMockHTTP() (*MockHTTPClient, func()) {
 			},
 		},
 	}
-	defaultHTTPClient = mock
-	return mock, func() { defaultHTTPClient = orig }
+	setDefaultHTTPClient(mock)
+	return mock, func() { setDefaultHTTPClient(orig) }
 }
 
 func TestExecuteSelfUpdate(t *testing.T) {

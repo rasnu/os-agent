@@ -9,15 +9,15 @@ import (
 )
 
 func TestCollectAndSendMetrics(t *testing.T) {
-	origDefault := defaultHTTPClient
+	origDefault := getDefaultHTTPClient()
 	origHeartbeat := heartbeatHTTPClient
 	defer func() {
-		defaultHTTPClient = origDefault
+		setDefaultHTTPClient(origDefault)
 		heartbeatHTTPClient = origHeartbeat
 	}()
 
 	mockHTTP := &MockHTTPClient{}
-	defaultHTTPClient = mockHTTP
+	setDefaultHTTPClient(mockHTTP)
 	heartbeatHTTPClient = mockHTTP
 
 	client := NewPusherClient("ws://", "http://localhost/api", "token", "srv", "")

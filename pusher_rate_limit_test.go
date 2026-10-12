@@ -63,9 +63,9 @@ func TestPusherRateLimit_EventThrottling(t *testing.T) {
 	defer httpServer.Close()
 
 	// Redirect defaultHTTPClient to mock server
-	origHTTP := defaultHTTPClient
-	defaultHTTPClient = httpServer.Client()
-	defer func() { defaultHTTPClient = origHTTP }()
+	origHTTP := getDefaultHTTPClient()
+	setDefaultHTTPClient(httpServer.Client())
+	defer func() { setDefaultHTTPClient(origHTTP) }()
 
 	// Mock WebSocket server
 	wsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -115,6 +115,10 @@ func TestPusherRateLimit_EventThrottling(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatalf("Timed out waiting for client to disconnect")
 	}
+
+	client.CancelAllCommands()
+	client.WaitCommands()
+
 
 	// Verify completions
 	mu.Lock()

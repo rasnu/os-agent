@@ -117,6 +117,8 @@ func TestAgent_E2E_ExecuteCommand_And_Stream_Completion(t *testing.T) {
 	// 4. Initialize and Connect the Agent
 	client := NewPusherClient(wsURL, httpServer.URL, "test-token", "srv-e2e", "")
 	defer client.Close()
+	defer client.WaitCommands()
+
 
 	err := client.Connect()
 	if err != nil {

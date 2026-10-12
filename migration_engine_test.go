@@ -47,9 +47,9 @@ func TestMigrationEngine_SingleFilePush(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	originalClient := defaultHTTPClient
-	defaultHTTPClient = ts.Client()
-	defer func() { defaultHTTPClient = originalClient }()
+	originalClient := getDefaultHTTPClient()
+	setDefaultHTTPClient(ts.Client())
+	defer func() { setDefaultHTTPClient(originalClient) }()
 
 	client := &PusherClient{ApiURL: ts.URL, Token: "test-token"}
 
@@ -117,9 +117,9 @@ func TestMigrationEngine_Security_FingerprintMismatch(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	originalClient := defaultHTTPClient
-	defaultHTTPClient = ts.Client()
-	defer func() { defaultHTTPClient = originalClient }()
+	originalClient := getDefaultHTTPClient()
+	setDefaultHTTPClient(ts.Client())
+	defer func() { setDefaultHTTPClient(originalClient) }()
 
 	client := &PusherClient{ApiURL: ts.URL, Token: "test"}
 
@@ -165,9 +165,9 @@ func TestMigrationEngine_DirectoryPull(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	originalClient := defaultHTTPClient
-	defaultHTTPClient = ts.Client()
-	defer func() { defaultHTTPClient = originalClient }()
+	originalClient := getDefaultHTTPClient()
+	setDefaultHTTPClient(ts.Client())
+	defer func() { setDefaultHTTPClient(originalClient) }()
 
 	client := &PusherClient{ApiURL: ts.URL, Token: "test-token"}
 
@@ -235,9 +235,9 @@ func TestMigrationEngine_NetworkInterrupt(t *testing.T) {
 	}
 	defer func() { execCommand = originalExec }()
 
-	originalClient := defaultHTTPClient
-	defaultHTTPClient = ts.Client()
-	defer func() { defaultHTTPClient = originalClient }()
+	originalClient := getDefaultHTTPClient()
+	setDefaultHTTPClient(ts.Client())
+	defer func() { setDefaultHTTPClient(originalClient) }()
 
 	client := &PusherClient{ApiURL: ts.URL, Token: "test-token"}
 

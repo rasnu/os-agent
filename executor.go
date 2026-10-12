@@ -359,7 +359,7 @@ func (c *PusherClient) streamLogHTTP(pipelineId string, stepId string, chunk str
 			if err == nil {
 				req.Header.Set("Content-Type", "application/json")
 				req.Header.Set("Authorization", "Bearer "+c.Token)
-				if resp, err := defaultHTTPClient.Do(req); err == nil && resp != nil {
+				if resp, err := getDefaultHTTPClient().Do(req); err == nil && resp != nil {
 					resp.Body.Close()
 				}
 			}
@@ -398,7 +398,7 @@ func (c *PusherClient) sendCompletion(pipelineId string, stepId string, success 
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 
-		resp, err := defaultHTTPClient.Do(req)
+		resp, err := getDefaultHTTPClient().Do(req)
 		if err != nil {
 			log.Printf("Completion attempt %d/%d failed (network error): %v", attempt, maxAttempts, err)
 			if attempt < maxAttempts {
@@ -491,7 +491,7 @@ func (c *PusherClient) sendDiscoveryCompletion(output string) {
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.Token)
 
-	resp, err := defaultHTTPClient.Do(req)
+	resp, err := getDefaultHTTPClient().Do(req)
 	if err != nil {
 		log.Printf("Error sending discovery completion: %v", err)
 		return

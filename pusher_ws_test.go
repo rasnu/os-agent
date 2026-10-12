@@ -53,14 +53,14 @@ func TestPusherClient_ConnectAndSubscribe(t *testing.T) {
 	// We replace heartbeat client to hit local server without custom HTTPDoer mocks
 	// because we pass the URL directly.
 
-	origDefault := defaultHTTPClient
+	origDefault := getDefaultHTTPClient()
 	origHeartbeat := heartbeatHTTPClient
 	defer func() {
-		defaultHTTPClient = origDefault
+		setDefaultHTTPClient(origDefault)
 		heartbeatHTTPClient = origHeartbeat
 	}()
 
-	defaultHTTPClient = &http.Client{}
+	setDefaultHTTPClient(&http.Client{})
 	heartbeatHTTPClient = &http.Client{}
 
 	err := client.Connect()
