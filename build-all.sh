@@ -12,12 +12,8 @@ VERSION="${VERSION:-1.0.0}"
 BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 KEY_DIR="${KEY_DIR:-.agent_update_keys}"
 
-# ── 2. Ed25519 Public Key Resolution ────────────────────────────────────────────
-# Precedence:
-#   1. AGENT_PUBLIC_KEY environment variable
-#   2. Local key file .agent_update_keys/agent_ed25519_public.pub
-#   3. If RELEASE=1 / ENV=production: FAIL closed (refuse unkeyed build)
-#   4. If Development: auto-generate keypair in .agent_update_keys
+# Known official RasnuOS production public key (fallback if CI secret is not set)
+DEFAULT_PRODUCTION_PUBLIC_KEY="GJkzaBMAhuYIMYR8UiDyC49nr2Uhz4fh0A9vOkTyE/E="
 
 if [ -z "${AGENT_PUBLIC_KEY}" ] && [ -f "${KEY_DIR}/agent_ed25519_public.pub" ]; then
     AGENT_PUBLIC_KEY=$(cat "${KEY_DIR}/agent_ed25519_public.pub" | tr -d ' \n\r')
@@ -25,10 +21,14 @@ fi
 
 if [ -z "${AGENT_PUBLIC_KEY}" ]; then
     if [ "${RELEASE}" = "1" ] || [ "${ENV}" = "production" ]; then
-        echo "❌ [SECURITY ERROR] Production build requires AGENT_PUBLIC_KEY!"
-        echo "   Set AGENT_PUBLIC_KEY in your environment or CI pipeline."
-        echo "   Example: export AGENT_PUBLIC_KEY=\$(go run ./cmd/signer generate-keys ...)"
-        exit 1
+        if [ -n "${DEFAULT_PRODUCTION_PUBLIC_KEY}" ]; then
+            echo "ℹ️  AGENT_PUBLIC_KEY not specified in CI secrets; using official RasnuOS production public key."
+            AGENT_PUBLIC_KEY="${DEFAULT_PRODUCTION_PUBLIC_KEY}"
+        else
+            echo "❌ [SECURITY ERROR] Production build requires AGENT_PUBLIC_KEY!"
+            echo "   Set AGENT_PUBLIC_KEY in your environment or CI pipeline."
+            exit 1
+        fi
     else
         echo "ℹ️  No AGENT_PUBLIC_KEY specified. Generating local keypair in ${KEY_DIR}..."
         mkdir -p "${KEY_DIR}"

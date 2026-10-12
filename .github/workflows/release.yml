@@ -1,15 +1,17 @@
 name: Agent Release
 
 on:
+  release:
+    types: [published]
   push:
     tags:
       - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. 1.0.1)'
+        description: 'Release version (e.g. 1.0.0)'
         required: false
-        default: '1.0.1'
+        default: '1.0.0'
 
 permissions:
   contents: write
@@ -36,15 +38,19 @@ jobs:
         id: vars
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
+            RAW_VER="${{ github.event.inputs.version }}"
+            VERSION="${RAW_VER#v}"
+            TAG_NAME="v${VERSION}"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            TAG_NAME="${{ github.event.release.tag_name }}"
+            VERSION="${TAG_NAME#v}"
           else
-            VERSION="${GITHUB_REF#refs/tags/v}"
-            if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF" ]; then
-              VERSION="${GITHUB_REF#refs/tags/}"
-            fi
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG_NAME#v}"
           fi
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Building agent version: ${VERSION}"
+          echo "TAG_NAME=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "Building agent version: ${VERSION} for tag: ${TAG_NAME}"
 
       - name: Run Test Suite with Race Detector
         run: go test -v -race ./...
@@ -67,11 +73,10 @@ jobs:
           cd ./dist
           sha256sum * > SHA256SUMS.txt 2>/dev/null || true
 
-      - name: Create GitHub Release and Upload Assets
+      - name: Upload Binaries to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "RasnuOS Agent v${{ steps.vars.outputs.VERSION }}"
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ steps.vars.outputs.TAG_NAME }}
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -80,3 +85,4 @@ jobs:
             dist/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
