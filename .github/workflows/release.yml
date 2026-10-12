@@ -103,7 +103,7 @@ jobs:
           cat SHA256SUMS.txt
 
       - name: Upload Binaries to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.vars.outputs.TAG_NAME }}
           draft: false
