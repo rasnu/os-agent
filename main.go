@@ -164,10 +164,13 @@ func run(args []string) error {
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(interrupt)
 	go func() {
 		sig := <-interrupt
-		log.Printf("Received %s, shutting down agent...", sig)
-		close(shutdown)
+		if sig != nil {
+			log.Printf("Received %s, shutting down agent...", sig)
+			close(shutdown)
+		}
 	}()
 
 	return runAgent(args, shutdown)

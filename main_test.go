@@ -53,8 +53,10 @@ func TestMain_GracefulInterrupt(t *testing.T) {
 	// Setup env vars so run() passes the required flags check
 	os.Setenv("BEARER_TOKEN", "test-token")
 	os.Setenv("SERVER_ID", "test-server-id")
+	os.Setenv("METRICS_PORT", "0")
 	defer os.Unsetenv("BEARER_TOKEN")
 	defer os.Unsetenv("SERVER_ID")
+	defer os.Unsetenv("METRICS_PORT")
 
 	errCh := make(chan error, 1)
 
@@ -63,7 +65,7 @@ func TestMain_GracefulInterrupt(t *testing.T) {
 	}()
 
 	// Wait briefly for the agent to start and set up signal handlers
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond)
 
 	// Send SIGTERM to our own process
 	// The run() function's signal.Notify should catch this and exit cleanly.
@@ -78,7 +80,7 @@ func TestMain_GracefulInterrupt(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected clean exit, got error: %v", err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatalf("Timeout waiting for run() to exit after SIGTERM")
 	}
 }

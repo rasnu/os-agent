@@ -1,14 +1,24 @@
 package main
 
 import (
-	"rasnuos-agent/os_adapter"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"rasnuos-agent/os_adapter"
 )
 
 func TestHandleAgentCommand(t *testing.T) {
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		w.Write([]byte(`{"success": true}`))
+	}))
+	defer testServer.Close()
+
 	client := &PusherClient{
 		cmdSemaphore: make(chan struct{}, 10),
-		ApiURL:       "http://localhost",
+		ApiURL:       testServer.URL,
 		Token:        "test-token",
 	}
 

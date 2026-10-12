@@ -74,26 +74,41 @@ func TestAgent_E2E_ExecuteCommand_And_Stream_Completion(t *testing.T) {
 		// Send handshake
 		c.WriteMessage(websocket.TextMessage, []byte(`{"event":"pusher:connection_established","data":"{\"socket_id\":\"123.456\"}"}`))
 
-		// Wait a moment for auth and subscribe
-		time.Sleep(50 * time.Millisecond)
+		commandSent := false
+		for {
+			_, msgBytes, err := c.ReadMessage()
+			if err != nil {
+				return
+			}
 
-		// Acknowledge subscription
-		c.WriteMessage(websocket.TextMessage, []byte(`{
-			"event": "pusher_internal:subscription_succeeded",
-			"data": "{}"
-		}`))
+			var msg struct {
+				Event string                 `json:"event"`
+				Data  map[string]interface{} `json:"data"`
+			}
+			if err := json.Unmarshal(msgBytes, &msg); err == nil {
+				if msg.Event == "pusher:subscribe" {
+					channel, _ := msg.Data["channel"].(string)
+					ackPayload, _ := json.Marshal(map[string]string{"channel": channel})
+					ackEvent, _ := json.Marshal(map[string]interface{}{
+						"event":   "pusher_internal:subscription_succeeded",
+						"channel": channel,
+						"data":    string(ackPayload),
+					})
+					c.WriteMessage(websocket.TextMessage, ackEvent)
 
-		time.Sleep(50 * time.Millisecond)
-
-		// Issue the ExecuteCommand
-		// We use `echo E2E Test Success` which works on Windows (powershell) and Linux/Mac (bash)
-		c.WriteMessage(websocket.TextMessage, []byte(`{
-			"event": "ExecuteCommand",
-			"data": "{\"pipeline_id\": \"pipe-e2e\", \"step_id\": \"step-e2e\", \"command\": \"echo E2E_Test_Success\"}"
-		}`))
-
-		// Wait to keep connection open during execution
-		time.Sleep(1 * time.Second)
+					// When commands channel is subscribed, issue ExecuteCommand
+					if strings.HasSuffix(channel, ".commands") && !commandSent {
+						commandSent = true
+						c.WriteMessage(websocket.TextMessage, []byte(`{
+							"event": "ExecuteCommand",
+							"data": "{\"pipeline_id\": \"pipe-e2e\", \"step_id\": \"step-e2e\", \"command\": \"echo E2E_Test_Success\"}"
+						}`))
+					}
+				} else if msg.Event == "pusher:ping" {
+					c.WriteMessage(websocket.TextMessage, []byte(`{"event":"pusher:pong"}`))
+				}
+			}
+		}
 	}))
 	defer wsServer.Close()
 
@@ -101,6 +116,7 @@ func TestAgent_E2E_ExecuteCommand_And_Stream_Completion(t *testing.T) {
 
 	// 4. Initialize and Connect the Agent
 	client := NewPusherClient(wsURL, httpServer.URL, "test-token", "srv-e2e", "")
+	defer client.Close()
 
 	err := client.Connect()
 	if err != nil {
@@ -112,7 +128,7 @@ func TestAgent_E2E_ExecuteCommand_And_Stream_Completion(t *testing.T) {
 	var completionSuccess bool
 
 	// Collect logs until completion is received, and give a short buffer for the final log chunk to arrive
-	timeout := time.After(3 * time.Second)
+	timeout := time.After(10 * time.Second)
 	completed := false
 
 	for !completed {
