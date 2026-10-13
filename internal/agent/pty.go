@@ -34,6 +34,13 @@ var (
 	sessionMutex   sync.Mutex
 )
 
+// ActiveTerminalSessionCount returns the number of currently open PTY terminal sessions.
+func ActiveTerminalSessionCount() int {
+	sessionMutex.Lock()
+	defer sessionMutex.Unlock()
+	return len(activeSessions)
+}
+
 // CleanupIdleSessions runs periodically and kills sessions idle for >30 minutes.
 func CleanupIdleSessions(shutdownChan chan struct{}) {
 	defer func() {

@@ -522,6 +522,19 @@ func (c *PusherClient) executeRawCommand(requestId, cmdStr, runAsUser string) {
 	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
 	defer cancel()
 
+	c.cmdMutex.Lock()
+	if c.activeCommands == nil {
+		c.activeCommands = make(map[string]context.CancelFunc)
+	}
+	c.activeCommands[requestId] = cancel
+	c.cmdMutex.Unlock()
+
+	defer func() {
+		c.cmdMutex.Lock()
+		delete(c.activeCommands, requestId)
+		c.cmdMutex.Unlock()
+	}()
+
 	cmd := osadapter.Current().GetShellCmd(ctx, cmdStr, runAsUser)
 	output, err := cmd.CombinedOutput()
 

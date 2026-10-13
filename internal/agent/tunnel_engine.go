@@ -30,6 +30,16 @@ var (
 	activeTunnels sync.Map
 )
 
+// ActiveTunnelCount returns the number of currently active P2P/reverse tunnels on this agent.
+func ActiveTunnelCount() int {
+	count := 0
+	activeTunnels.Range(func(_, _ interface{}) bool {
+		count++
+		return true
+	})
+	return count
+}
+
 func (c *PusherClient) handleTunnelCommand(action string, args map[string]interface{}) {
 	pipelineId := getString(args, "pipeline_id")
 	stepId := getString(args, "step_id")
