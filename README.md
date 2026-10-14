@@ -1,5 +1,7 @@
 # rasnuos-agent
 
+[![Agent CI](https://github.com/rasnu/os-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/rasnu/os-agent/actions/workflows/ci.yml)
+[![Agent Release](https://github.com/rasnu/os-agent/actions/workflows/release.yml/badge.svg)](https://github.com/rasnu/os-agent/actions/workflows/release.yml)
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)](go.mod)
 [![Platforms](https://img.shields.io/badge/Platforms-Linux%20%7C%20macOS%20%7C%20Windows-informational)](#platform-support)
 [![Architectures](https://img.shields.io/badge/Arch-amd64%20%7C%20arm64-success)](#building-and-verifying-releases)
@@ -25,6 +27,7 @@
 - [Local Observability & Audit Log](#local-observability--audit-log)
 - [Configuration](#configuration)
 - [Building and Verifying Releases](#building-and-verifying-releases)
+- [CI/CD & Automated Security Pipeline](#cicd--automated-security-pipeline)
 - [Directory Layout](#directory-layout)
 - [License](#license)
 
@@ -70,13 +73,15 @@ flowchart TD
     Daemon --> W4
 
     subgraph Gateways["Local Execution Controls"]
+        G0["Read-Only Mode Gate (--read-only)"]
         G1["Token-Bucket Limiter (100/min)"]
         G2["29 Regex Command Guardrails"]
         G3["Single-Use RAM Secret Store"]
         G4["Append-Only JSONL Audit Log"]
     end
 
-    W1 --> G1
+    W1 --> G0
+    G0 --> G1
     G1 --> G2
     G2 --> G3
     G3 --> G4
@@ -84,7 +89,7 @@ flowchart TD
     subgraph Platform["OS Adapter Interface"]
         P1["Linux (systemd, bash, pty)"]
         P2["macOS (launchd, zsh, pty)"]
-        P3["Windows (SCM, PowerShell)"]
+        P3["Windows (SCM, PowerShell, ConPTY)"]
     end
 
     G4 --> P1
@@ -319,9 +324,63 @@ Requires **Go 1.25+**:
 # Run unit and race-detector tests
 go test -v -race -count=1 ./...
 
-# Build a static binary
+# Build a single static binary for the current host
 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o rasnuos-agent ./cmd/rasnuos-agent
+
+# Cross-compile and Ed25519-sign all 6 OS/Arch targets (Linux, macOS, Windows × amd64, arm64)
+./scripts/build-all.sh
 ```
+
+---
+
+## CI/CD & Automated Security Pipeline
+
+Every commit, pull request, and tagged release passes through two automated GitHub Actions workflows in [`.github/workflows/`](.github/workflows):
+
+```mermaid
+%%{init: {'htmlLabels': false, 'flowchart': {'htmlLabels': false, 'wrappingWidth': 420, 'padding': 16, 'nodeSpacing': 36, 'rankSpacing': 42}}}%%
+flowchart LR
+    subgraph CI["1. Agent CI (ci.yml)"]
+        A1["go mod verify & tidy"] --> A2["gofmt & go vet"]
+        A2 --> A3["go test -race -cover"]
+        A3 --> A4["6-Target Cross-Build"]
+        A3 --> A5["govulncheck + gosec + gitleaks"]
+    end
+
+    subgraph CD["2. Agent Release (release.yml)"]
+        B1["SemVer & Race Tests"] --> B2["Embed Version & Public Key"]
+        B2 --> B3["Ed25519 Sign & Verify (.sig)"]
+        B3 --> B4["Smoke Test (--version / --key-info)"]
+        B4 --> B5["Publish 6 Binaries + SHA256SUMS.txt"]
+    end
+
+    CI --> CD
+```
+
+### 1. Continuous Integration ([`.github/workflows/ci.yml`](.github/workflows/ci.yml))
+Triggered automatically on pushes and pull requests to `main`, `develop`, and `master`:
+
+| Job | Checks Performed | Failure Policy |
+| :--- | :--- | :--- |
+| **`Lint & Test (race detector)`** | • `go mod verify` & `go mod tidy` working-tree diff check<br/>• `gofmt -l .` formatting enforcement<br/>• `go vet ./...` static analysis<br/>• `go test -v -race -count=1 -coverprofile=coverage.out ./...`<br/>• Post-test `git status --porcelain` check (ensures tests leave zero untracked artifacts) | **Fail-closed** (blocks merge on any race condition, test failure, or unformatted file) |
+| **`Cross-Platform Build`** | • Executes [`scripts/build-all.sh`](scripts/build-all.sh) across all 6 target triples (`linux/amd64`, `linux/arm64`, `darwin/amd64`, `darwin/arm64`, `windows/amd64`, `windows/arm64`)<br/>• Generates ephemeral Ed25519 test keys, signs all 6 binaries, and verifies every `.sig` signature | **Fail-closed** (blocks merge if any OS/Arch target fails to compile or verify) |
+| **`Security Scans`** | • **`govulncheck`**: Analyzes reachable call paths against the Go Vulnerability Database<br/>• **`gosec` (SAST)**: Static Application Security Testing report published to the GitHub Step Summary<br/>• **`gitleaks` (`v8.21.2`)**: Full git history (`fetch-depth: 0`) secret and credential scanner | **Fail-closed** on `govulncheck` vulnerabilities and `gitleaks` secret detections |
+
+### 2. Cryptographic Release Pipeline ([`.github/workflows/release.yml`](.github/workflows/release.yml))
+Triggered when a GitHub Release is published or manually via `workflow_dispatch` with a semantic version input (e.g., `1.0.1`):
+
+1. **Semantic Version & Race-Detector Gate:** Validates `X.Y.Z` tag format and runs `go test -race -count=1 ./...` before compiling.
+2. **Fail-Closed Production Compilation (`RELEASE=1 ENV=production`):** Runs [`scripts/build-all.sh`](scripts/build-all.sh) with linker flags embedding both the version (`internal/buildinfo.Version`) and the 32-byte Ed25519 public key (`internal/agent.AgentPublicKeyBase64`).
+3. **Detached Ed25519 Signing & Immediate Verification:** Signs each of the 6 compiled binaries using `cmd/signer` and `AGENT_PRIVATE_KEY` to produce `<binary>.sig`, then immediately runs `cmd/signer verify` against `AGENT_PUBLIC_KEY`. If `AGENT_PRIVATE_KEY` is missing in release mode, the pipeline aborts immediately so an unsigned release can never be published.
+4. **Binary Smoke Checks:** Executes `./dist/rasnuos-agent-linux-amd64 --version` and `--key-info` in CI, asserting that the compiled binary reports the exact release version and `Update Public Key: configured (32-byte Ed25519)`.
+5. **Artifact Publication:** Generates individual `.sha256` files and a consolidated `SHA256SUMS.txt` manifest, then uploads all 19 release assets (`6 binaries + 6 .sig + 6 .sha256 + SHA256SUMS.txt`) to the GitHub Release via `softprops/action-gh-release@v3`.
+
+### 3. Required Repository Secrets for Releases
+
+| GitHub Secret | Format | Purpose |
+| :--- | :--- | :--- |
+| `AGENT_PUBLIC_KEY` | Base64-encoded 32-byte Ed25519 public key | Embedded into every compiled agent binary via `-ldflags` to verify future over-the-air self-updates. |
+| `AGENT_PRIVATE_KEY` | Base64-encoded 64-byte Ed25519 private key | Used exclusively inside `release.yml` by `cmd/signer` to generate `.sig` detached signatures for all 6 platform binaries. |
 
 ---
 
@@ -329,20 +388,24 @@ CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o rasnuos-agent ./cmd/rasnuos
 
 ```text
 agent/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml           # Continuous integration (gofmt, go vet, race tests, 6-target build, govulncheck, gosec, gitleaks)
+│       └── release.yml      # Automated Ed25519 signing, verification, and GitHub Release publishing
 ├── cmd/
 │   ├── rasnuos-agent/       # Daemon entrypoint
-│   └── signer/              # Ed25519 key generation and signature verification CLI
+│   └── signer/              # Ed25519 key generation, binary signing, and signature verification CLI
 ├── internal/
 │   ├── agent/               # WebSocket client, command/PTY/file/IDE/migration/tunnel/telemetry workers
 │   ├── audit/               # Append-only 0600 JSONL local security audit log
-│   ├── buildinfo/           # Build version metadata
+│   ├── buildinfo/           # Build version metadata injected via -ldflags
 │   ├── guardrails/          # 29 pre-compiled destructive command regex rules
 │   ├── observability/       # Loopback 127.0.0.1:9090 /healthz and Prometheus /metrics server
-│   ├── osadapter/           # Platform implementations for Linux, macOS, and Windows
+│   ├── osadapter/           # Platform implementations for Linux, macOS, and Windows (ConPTY & SCM)
 │   ├── ratelimit/           # Token-bucket rate limiter
 │   └── transport/           # Forced-IPv4 HTTP client and SHA-256 SPKI certificate pinning
 └── scripts/
-    └── build-all.sh         # Cross-compilation build script
+    └── build-all.sh         # Multi-platform cross-compilation and Ed25519 signing script
 ```
 
 ---
