@@ -7,7 +7,7 @@
 [![Architectures](https://img.shields.io/badge/Arch-amd64%20%7C%20arm64-success)](#building-and-verifying-releases)
 [![License: FSL-1.1-ALv2](https://img.shields.io/badge/License-FSL--1.1--ALv2-blue.svg)](LICENSE)
 
-`rasnuos-agent` is the host daemon for [RasnuOS](https://rasnu.com). It is written in Go, compiles to a single static binary with `CGO_ENABLED=0`, and runs on Linux, macOS, and Windows across `amd64` and `arm64` architectures.
+`rasnuos-agent` is the host daemon for [RasnuOS](https://os.rasnu.com). It is written in Go, compiles to a single static binary with `CGO_ENABLED=0`, and runs on Linux, macOS, and Windows across `amd64` and `arm64` architectures.
 
 > [!IMPORTANT]
 > **Source Availability & Security Auditing**  
@@ -404,8 +404,13 @@ agent/
 │   ├── osadapter/           # Platform implementations for Linux, macOS, and Windows (ConPTY & SCM)
 │   ├── ratelimit/           # Token-bucket rate limiter
 │   └── transport/           # Forced-IPv4 HTTP client and SHA-256 SPKI certificate pinning
-└── scripts/
-    └── build-all.sh         # Multi-platform cross-compilation and Ed25519 signing script
+├── scripts/
+│   └── build-all.sh         # Multi-platform cross-compilation and Ed25519 signing script
+├── CODE_OF_CONDUCT.md       # Contributor Covenant v2.1 code of conduct
+├── CONTRIBUTING.md          # Development workflow, race-test gates, and architecture rules
+├── LICENSE                  # Functional Source License (FSL-1.1-ALv2)
+├── README.md                # Architecture, security model, and configuration reference
+└── SECURITY.md              # Vulnerability disclosure policy, SLAs, and Ed25519 verification guide
 ```
 
 ---
