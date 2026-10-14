@@ -198,6 +198,7 @@ flowchart TD
 
 | Control | Source File | Implementation |
 | :--- | :--- | :--- |
+| **Read-Only Mode** | [`internal/agent/run.go`](internal/agent/run.go), [`pusher.go`](internal/agent/pusher.go) & [`file_manager.go`](internal/agent/file_manager.go) | Optional `--read-only` flag (`AGENT_READ_ONLY=true`) enforces zero-trust observability mode at the host level—permitting telemetry, service discovery, and read-only file listing while rejecting shell commands, IDE edits, file writes/deletions, service mutations, process kills, and interactive PTY sessions. |
 | **TLS SPKI Pinning** | [`internal/transport/tlspin.go`](file:///home/theafaid/work/rasnuos/agent/internal/transport/tlspin.go) | Optional `--tls-pin` / `TLS_PIN` verifies `sha256(cert.RawSubjectPublicKeyInfo)` across the certificate chain on all WSS and HTTPS connections. Supports comma-separated pins for key rotation. |
 | **Ed25519 Binary Verification** | [`internal/agent/updater.go`](file:///home/theafaid/work/rasnuos/agent/internal/agent/updater.go) | Verifies updates with `crypto/ed25519`, writes temporary files with `0600` permissions, enforces a `100 MB` download limit, and runs `--version` before swapping the executable. |
 | **In-RAM Secret Store** | [`internal/agent/secret_store.go`](file:///home/theafaid/work/rasnuos/agent/internal/agent/secret_store.go) | Holds runtime secrets only in process memory, scopes each secret batch to a single step ID, deletes them on first read (`retrieveAndWipeSecrets`), and expires unread entries after 5 minutes. |
@@ -229,14 +230,14 @@ Before spawning a shell process, [`internal/guardrails/guardrails.go`](file:///h
 
 Platform-specific behavior is isolated behind the [`OSAdapter`](file:///home/theafaid/work/rasnuos/agent/internal/osadapter/adapter.go) interface using Go build tags (`linux`, `darwin`, `windows`):
 
-| Capability | Linux (`linux.go`) | macOS (`macos.go`) | Windows (`windows.go`) |
+| Capability | Linux (`linux.go`) | macOS (`macos.go`) | Windows (`windows.go` & `conpty_windows.go`) |
 | :--- | :--- | :--- | :--- |
 | **Command Shell** | `bash -c` (`su - <user> -c` when `runAsUser` is set) | `$SHELL -c` (fallback `/bin/zsh` → `/bin/bash`; `su - <user> -c`) | `powershell -NoProfile -NonInteractive -Command` |
-| **Interactive PTY** | `creack/pty` (`bash`, `TERM=xterm-256color`) | `creack/pty` (`$SHELL` / `/bin/zsh`, `TERM=xterm-256color`) | `cmd.exe` over standard pipes (`Stderr` merged into `Stdout`) |
+| **Interactive PTY** | `creack/pty` (`bash`, `TERM=xterm-256color`) | `creack/pty` (`$SHELL` / `/bin/zsh`, `TERM=xterm-256color`) | Native Windows ConPTY (`CreatePseudoConsole` + PowerShell), fallback to line-buffered `cmd.exe` pipes |
 | **Service Discovery** | 12 common daemons + `systemctl list-units --type=service --state=failed` | 8 common daemons (`pgrep -x`) + `launchctl list` non-zero exit check | 16 Windows services (`Get-Service`) + WMI `Win32_Service` crashed `Auto` services |
 | **OOM Detection** | `dmesg -T` (`Out of memory: Killed process`), fallback `journalctl -k` | `log show` (`jetsam` / `low swap` over last 5m) | System Event Log (`Microsoft-Windows-Resource-Exhaustion-Detector`, Event ID 2004) |
 | **Service Control** | `systemctl <start\|stop\|restart> <service>` | `brew services <action>`, fallback `launchctl kickstart/kill` | PowerShell `Start-Service` / `Stop-Service` / `Restart-Service` |
-| **Scheduled Jobs** | `/etc/cron.d/rasnuos-jobs` (`0644`) + `systemctl restart cron` | User `crontab -` via `stdin` | `C:\ProgramData\RasnuOS\cron_job.ps1` (`0600`) + Windows Scheduled Task |
+| **Scheduled Jobs** | `/etc/cron.d/rasnuos-jobs` (`0644`) + `systemctl restart cron` | Non-destructive managed block merge (`# BEGIN/END RASNUOS MANAGED JOBS`) in user `crontab` | Non-destructive managed block merge in `C:\ProgramData\RasnuOS\cron_job.ps1` (`0600`) + Windows Scheduled Task |
 | **Firewall Rules** | `ufw allow/delete allow <port>/tcp`, fallback `iptables -I/-D INPUT` | No-op (`pfctl` requires full ruleset reload) | `New-NetFirewallRule` / `Remove-NetFirewallRule` |
 | **Machine ID** | `/etc/machine-id` (fallback `/var/lib/dbus/machine-id`) | `ioreg -rd1 -c IOPlatformExpertDevice` (`IOPlatformUUID`) | Registry `HKLM:\SOFTWARE\Microsoft\Cryptography` → `MachineGuid` |
 | **Application Log** | `/var/log/rasnuos-agent.log` | `/var/log/rasnuos-agent.log` | `C:\ProgramData\RasnuOS\Agent\rasnuos-agent.log` |
@@ -283,6 +284,7 @@ All CLI flags can also be supplied through environment variables ([`internal/age
 | `--server-id` | `SERVER_ID` | **Yes** | — | Unique server identifier. |
 | `--api` | `API_URL` | No | `http://localhost:8000/api` | Control plane API base URL. |
 | `--server` | `REVERB_SCHEME`, `REVERB_HOST`, `REVERB_PORT`, `REVERB_APP_KEY` | No | `ws://localhost:8080/app/...` | WebSocket endpoint URL (or constructed from `REVERB_*` variables). |
+| `--read-only` | `AGENT_READ_ONLY` | No | `false` | Enforce read-only observability mode (`true` / `1` blocks all mutating commands, file edits, and PTY sessions). |
 | `--tls-pin` | `TLS_PIN` | No | *(disabled)* | Comma-separated `sha256//<base64>` SPKI hashes for TLS pinning. |
 | `--version` | — | No | `false` | Print `rasnuos-agent <version>` and exit. |
 | `--key-info` | — | No | `false` | Print embedded Ed25519 update public key status and exit. |
