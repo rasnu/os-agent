@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +26,45 @@ import (
 	"rasnuos-agent/internal/audit"
 	"rasnuos-agent/internal/transport"
 )
+
+// normalizePlatformPath maps Unix-style root paths emitted by the web File Explorer
+// (e.g. "/", "/Users", "/C:/Users") to native Windows drive paths (e.g. "C:\\", "C:\\Users")
+// when running on Windows, while preserving relative paths so filepath.IsAbs rejects them.
+func normalizePlatformPath(p string) string {
+	return normalizePlatformPathForOS(p, runtime.GOOS, os.Getenv("SystemDrive"))
+}
+
+func normalizePlatformPathForOS(p, goos, sysDrive string) string {
+	if goos != "windows" || p == "" {
+		return p
+	}
+	sysDrive = strings.TrimRight(strings.TrimSpace(sysDrive), "\\/")
+	if sysDrive == "" {
+		sysDrive = "C:"
+	}
+
+	p = strings.TrimSpace(p)
+	if p == "/" || p == "\\" || p == "~" {
+		return sysDrive + "\\"
+	}
+
+	// Strip leading slash before a Windows drive letter, e.g. "/C:/Users" -> "C:/Users"
+	if len(p) >= 3 && (p[0] == '/' || p[0] == '\\') && ((p[1] >= 'A' && p[1] <= 'Z') || (p[1] >= 'a' && p[1] <= 'z')) && p[2] == ':' {
+		p = p[1:]
+	}
+
+	// Bare drive letter like "C:" -> "C:\" so filepath.IsAbs is true
+	if len(p) == 2 && ((p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z')) && p[1] == ':' {
+		return p + "\\"
+	}
+
+	// Unix-style absolute path without drive letter (e.g. "/Users/Administrator") -> "C:\Users\Administrator"
+	if strings.HasPrefix(p, "/") || (strings.HasPrefix(p, "\\") && !strings.HasPrefix(p, "\\\\")) {
+		p = sysDrive + p
+	}
+
+	return strings.ReplaceAll(p, "/", "\\")
+}
 
 func getInt(m map[string]interface{}, key string) int {
 	if v, ok := m[key].(int); ok {
@@ -41,13 +81,29 @@ func getInt(m map[string]interface{}, key string) int {
 	return 0
 }
 
+func isReadOnlyFileAction(action string) bool {
+	switch action {
+	case "read-file", "list-directory", "search-files", "stat-path", "checksum-file", "tail-file", "head-file", "diff-files":
+		return true
+	default:
+		return false
+	}
+}
+
 func (c *PusherClient) handleFileCommand(action string, args map[string]interface{}) {
 	pipelineId := getString(args, "pipeline_id")
 	stepId := getString(args, "step_id")
-	path := getString(args, "path")
+	path := normalizePlatformPath(getString(args, "path"))
 
 	if pipelineId == "" || stepId == "" || (path == "" && action != "write-files") {
 		log.Printf("File command missing pipeline_id, step_id, or path")
+		return
+	}
+
+	if c.ReadOnly && !isReadOnlyFileAction(action) {
+		log.Printf("File command %s rejected on %s: agent is in read-only mode", action, path)
+		audit.Log(audit.Event{Action: "read_only_rejected", PipelineID: pipelineId, StepID: stepId, Command: fmt.Sprintf("%s %s", action, path), Success: false, Error: "Agent is in read-only mode"})
+		c.sendFileCompletion(pipelineId, stepId, false, "Agent rejected file mutation: agent is running in Read-Only mode (--read-only / AGENT_READ_ONLY=true).", nil)
 		return
 	}
 
@@ -132,6 +188,7 @@ func (c *PusherClient) handleFileCommand(action string, args map[string]interfac
 			if fPath == "" {
 				continue
 			}
+			fPath = normalizePlatformPath(fPath)
 
 			if !filepath.IsAbs(fPath) {
 				success = false
@@ -239,7 +296,18 @@ func (c *PusherClient) handleFileCommand(action string, args map[string]interfac
 			logMsg = "File written successfully"
 		}
 	case "delete-file":
-		err := os.Remove(path)
+		cleanPath := filepath.Clean(path)
+		if cleanPath == "/" || cleanPath == filepath.VolumeName(cleanPath)+"\\" {
+			success = false
+			logMsg = "Refusing to delete root directory"
+			break
+		}
+		var err error
+		if info, statErr := os.Stat(cleanPath); statErr == nil && info.IsDir() {
+			err = os.RemoveAll(cleanPath)
+		} else {
+			err = os.Remove(cleanPath)
+		}
 		if err != nil {
 			success = false
 			logMsg = fmt.Sprintf("Failed to delete file: %v", err)
@@ -285,7 +353,7 @@ func (c *PusherClient) handleFileCommand(action string, args map[string]interfac
 		} else {
 			success = true
 			logMsg = "Directory listed successfully"
-			var fileList []map[string]interface{}
+			fileList := make([]map[string]interface{}, 0)
 			for i, f := range files {
 				if i >= 2000 {
 					logMsg = "Directory listed successfully (truncated to 2000 files)"
@@ -342,6 +410,7 @@ func (c *PusherClient) handleFileCommand(action string, args map[string]interfac
 			logMsg = "new_path or destination is required"
 			break
 		}
+		newPath = normalizePlatformPath(newPath)
 		if !filepath.IsAbs(newPath) {
 			success = false
 			logMsg = "new_path must be an absolute path"
@@ -550,6 +619,7 @@ func (c *PusherClient) sendFileCompletion(pipelineId string, stepId string, succ
 }
 
 func (c *PusherClient) uploadFileToDashboard(requestId, filePath, uploadUrl string) {
+	filePath = normalizePlatformPath(filePath)
 	log.Printf("Uploading file %s to %s", filePath, uploadUrl)
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -615,6 +685,7 @@ func (c *PusherClient) uploadFileToDashboard(requestId, filePath, uploadUrl stri
 }
 
 func (c *PusherClient) downloadFileFromDashboard(requestId, targetPath, downloadUrl string) {
+	targetPath = normalizePlatformPath(targetPath)
 	log.Printf("Downloading file from %s to %s", downloadUrl, targetPath)
 
 	req, err := http.NewRequest("GET", downloadUrl, nil)

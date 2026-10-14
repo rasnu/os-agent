@@ -418,3 +418,35 @@ func TestFileManager_AtomicWriteFilesAndHelpers(t *testing.T) {
 		t.Errorf("list-directory with symlink failed: %v", lastReqBody["log"])
 	}
 }
+
+func TestNormalizePlatformPathForWindows(t *testing.T) {
+	cases := []struct {
+		input    string
+		sysDrive string
+		expected string
+	}{
+		{"/", "C:", `C:\`},
+		{"\\", "C:", `C:\`},
+		{"~", "D:", `D:\`},
+		{"/Users", "C:", `C:\Users`},
+		{"/Users/Administrator/notes.txt", "C:", `C:\Users\Administrator\notes.txt`},
+		{"/C:/Users/Administrator", "C:", `C:\Users\Administrator`},
+		{"C:/Users/Administrator", "C:", `C:\Users\Administrator`},
+		{`C:\Users\Administrator`, "C:", `C:\Users\Administrator`},
+		{"C:", "C:", `C:\`},
+		{"/C:", "C:", `C:\`},
+		{"../secret.txt", "C:", `..\secret.txt`},
+	}
+
+	for _, tc := range cases {
+		got := normalizePlatformPathForOS(tc.input, "windows", tc.sysDrive)
+		if got != tc.expected {
+			t.Errorf("normalizePlatformPathForOS(%q, windows, %q) = %q, want %q", tc.input, tc.sysDrive, got, tc.expected)
+		}
+	}
+
+	// Ensure non-Windows OS paths are untouched
+	if got := normalizePlatformPathForOS("/var/www/html", "linux", ""); got != "/var/www/html" {
+		t.Errorf("Expected Linux path to remain untouched, got %q", got)
+	}
+}

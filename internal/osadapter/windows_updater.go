@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/shirou/gopsutil/v3/disk"
@@ -62,6 +63,16 @@ func (a *WindowsAdapter) KillProcess(pid string) (string, error) {
 
 func (a *WindowsAdapter) WriteCronJobs(content string) error {
 	scriptPath := `C:\ProgramData\RasnuOS\cron_job.ps1`
+	if err := os.MkdirAll(filepath.Dir(scriptPath), 0700); err != nil {
+		return fmt.Errorf("WriteCronJobs: failed to create directory: %w", err)
+	}
+
+	if !HasExecutableCronLines(content) {
+		_ = os.Remove(scriptPath)
+		_ = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", "Unregister-ScheduledTask -TaskName 'RasnuOS_CronJob' -Confirm:$false -ErrorAction SilentlyContinue").Run()
+		return nil
+	}
+
 	if err := os.WriteFile(scriptPath, []byte(content), 0600); err != nil {
 		return fmt.Errorf("WriteCronJobs: failed to write script: %w", err)
 	}

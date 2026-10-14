@@ -10,10 +10,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -164,6 +166,8 @@ function _RasnuLaunchAsUser {
 func (a *WindowsAdapter) StartPTY(cols, rows uint16) (PTY, error) {
 	if conpty, err := startWindowsConPTY(cols, rows); err == nil {
 		return conpty, nil
+	} else {
+		log.Printf("[PTY] ConPTY unavailable (%v), falling back to pipe PTY", err)
 	}
 
 	cmd := exec.Command("cmd.exe")
@@ -184,10 +188,25 @@ func (a *WindowsAdapter) StartPTY(cols, rows uint16) (PTY, error) {
 		return nil, err
 	}
 
+	pr, pw := io.Pipe()
+	echoCh := make(chan []byte, 256)
+	go func() {
+		_, _ = io.Copy(pw, stdout)
+		_ = pw.Close()
+	}()
+	go func() {
+		for b := range echoCh {
+			_, _ = pw.Write(b)
+		}
+	}()
+
 	return &WindowsPTY{
-		cmd:    cmd,
-		stdin:  stdin,
-		stdout: stdout,
+		cmd:       cmd,
+		stdin:     stdin,
+		stdout:    stdout,
+		outReader: pr,
+		outWriter: pw,
+		echoCh:    echoCh,
 	}, nil
 }
 
@@ -203,17 +222,61 @@ func (a *WindowsAdapter) UninstallService() error {
 }
 
 type WindowsPTY struct {
-	cmd    *exec.Cmd
-	stdin  io.WriteCloser
-	stdout io.ReadCloser
+	mu        sync.Mutex
+	cmd       *exec.Cmd
+	stdin     io.WriteCloser
+	stdout    io.ReadCloser
+	outReader *io.PipeReader
+	outWriter *io.PipeWriter
+	echoCh    chan []byte
+	lineBuf   []byte
+	closed    bool
+}
+
+func (w *WindowsPTY) echo(b []byte) {
+	if w.closed {
+		return
+	}
+	select {
+	case w.echoCh <- b:
+	default:
+	}
 }
 
 func (w *WindowsPTY) Read(p []byte) (n int, err error) {
-	return w.stdout.Read(p)
+	return w.outReader.Read(p)
 }
 
 func (w *WindowsPTY) Write(p []byte) (n int, err error) {
-	return w.stdin.Write(p)
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	for _, b := range p {
+		switch b {
+		case '\r', '\n':
+			w.echo([]byte("\r"))
+			line := append(append([]byte(nil), w.lineBuf...), '\r', '\n')
+			w.lineBuf = w.lineBuf[:0]
+			if _, err := w.stdin.Write(line); err != nil {
+				return 0, err
+			}
+		case 0x7f, '\b':
+			if len(w.lineBuf) > 0 {
+				w.lineBuf = w.lineBuf[:len(w.lineBuf)-1]
+				w.echo([]byte("\b \b"))
+			}
+		case 0x03: // Ctrl+C
+			w.lineBuf = w.lineBuf[:0]
+			w.echo([]byte("^C\r\n"))
+			_, _ = w.stdin.Write([]byte("\r\n"))
+		default:
+			if b >= 0x20 {
+				w.lineBuf = append(w.lineBuf, b)
+				w.echo([]byte{b})
+			}
+		}
+	}
+	return len(p), nil
 }
 
 func (w *WindowsPTY) Resize(cols, rows uint16) error {
@@ -221,7 +284,15 @@ func (w *WindowsPTY) Resize(cols, rows uint16) error {
 }
 
 func (w *WindowsPTY) Close() error {
-	w.stdin.Close()
+	w.mu.Lock()
+	if !w.closed {
+		w.closed = true
+		close(w.echoCh)
+	}
+	w.mu.Unlock()
+	_ = w.stdin.Close()
+	_ = w.outWriter.Close()
+	_ = w.outReader.Close()
 	return w.stdout.Close()
 }
 

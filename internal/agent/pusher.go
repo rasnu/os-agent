@@ -52,6 +52,7 @@ type PusherClient struct {
 	Token            string
 	ServerID         string
 	TLSPin           string
+	ReadOnly         bool
 	conn             *websocket.Conn
 	done             chan struct{}
 	writeMutex       sync.Mutex
@@ -91,12 +92,16 @@ func NewPusherClient(serverURL, apiURL, token, serverId, tlsPin string) *PusherC
 		}
 	}
 
+	readOnlyEnv := strings.ToLower(strings.TrimSpace(os.Getenv("AGENT_READ_ONLY")))
+	readOnly := readOnlyEnv == "true" || readOnlyEnv == "1" || readOnlyEnv == "yes"
+
 	return &PusherClient{
 		ServerURL:      serverURL,
 		ApiURL:         apiURL,
 		Token:          token,
 		ServerID:       serverId,
 		TLSPin:         tlsPin,
+		ReadOnly:       readOnly,
 		activeCommands: make(map[string]context.CancelFunc),
 		cmdSemaphore:   make(chan struct{}, MaxConcurrentCommands),
 		rateLimiter:    ratelimit.New(rateLimit),
@@ -403,6 +408,13 @@ func (c *PusherClient) readPump() {
 				continue
 			}
 
+			if c.ReadOnly {
+				log.Printf("ExecuteCommand rejected on step %s: agent is in read-only mode", stepId)
+				audit.Log(audit.Event{Action: "read_only_rejected", Command: fmt.Sprintf("ExecuteCommand:%s", stepId), Success: false, Error: "Agent is in read-only mode"})
+				c.sendCompletion(pipelineId, stepId, false, "Agent rejected command: agent is running in Read-Only mode (--read-only / AGENT_READ_ONLY=true).")
+				continue
+			}
+
 			if c.rateLimiter != nil && !c.rateLimiter.Allow() {
 				log.Printf("Rate limit exceeded for ExecuteCommand on step %s (max %d commands/min)", stepId, c.rateLimiter.Capacity())
 				audit.Log(audit.Event{Action: "rate_limit_exceeded", Command: fmt.Sprintf("ExecuteCommand:%s", stepId), Success: false, Error: "Rate limit exceeded"})
@@ -539,6 +551,11 @@ func (c *PusherClient) readPump() {
 			}
 			termID := getString(payload, "term_id")
 			if termID != "" && isValidTermID(termID) {
+				if c.ReadOnly {
+					log.Printf("Terminal session %s rejected: agent is in read-only mode", termID)
+					audit.Log(audit.Event{Action: "read_only_rejected", Command: termID, Success: false, Error: "Agent is in read-only mode"})
+					continue
+				}
 				if c.rateLimiter != nil && !c.rateLimiter.Allow() {
 					log.Printf("Rate limit exceeded for client-TerminalStart on session %s (max %d commands/min)", termID, c.rateLimiter.Capacity())
 					audit.Log(audit.Event{Action: "pty_session_rate_limited", Command: termID, Success: false, Error: "Rate limit exceeded"})
@@ -622,6 +639,17 @@ func (c *PusherClient) handleAgentCommand(command string, args map[string]interf
 	var errMsg string
 	pipelineId := getString(args, "pipeline_id")
 	stepId := getString(args, "step_id")
+
+	if c.ReadOnly && command != "update_config" && command != "upload-file-to-dashboard" {
+		log.Printf("AgentCommandIssued %s rejected: agent is in read-only mode", command)
+		audit.Log(audit.Event{Action: "read_only_rejected", PipelineID: pipelineId, StepID: stepId, Command: command, Success: false, Error: "Agent is in read-only mode"})
+		if reqID := getString(args, "request_id"); reqID != "" {
+			c.sendMigrationCompletion(reqID, reqID, false, "Agent rejected operation: agent is running in Read-Only mode (--read-only / AGENT_READ_ONLY=true).", nil)
+		} else if stepId != "" {
+			c.sendCompletion(pipelineId, stepId, false, "Agent rejected operation: agent is running in Read-Only mode (--read-only / AGENT_READ_ONLY=true).")
+		}
+		return
+	}
 
 	switch command {
 	case "update_config":

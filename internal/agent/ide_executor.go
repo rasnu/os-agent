@@ -92,6 +92,7 @@ func handleViewFile(payload IdeIntentPayload) (string, error) {
 	if payload.AbsolutePath == "" {
 		return "", fmt.Errorf("absolute_path is required")
 	}
+	payload.AbsolutePath = normalizePlatformPath(payload.AbsolutePath)
 
 	info, statErr := os.Stat(payload.AbsolutePath)
 	if statErr != nil {
@@ -144,7 +145,7 @@ func handleMultiReplaceFileContent(payload IdeIntentPayload) (string, error) {
 		return "", fmt.Errorf("no replacement chunks provided")
 	}
 
-	target := payload.TargetFile
+	target := normalizePlatformPath(payload.TargetFile)
 
 	// Canonicalize path and resolve symlinks before checking restricted system prefixes.
 	cleanTarget, err := filepath.Abs(filepath.Clean(target))
@@ -325,7 +326,7 @@ func handleWriteToFile(payload IdeIntentPayload) (string, error) {
 		return "", fmt.Errorf("code_content is required")
 	}
 
-	target := payload.TargetFile
+	target := normalizePlatformPath(payload.TargetFile)
 
 	// Canonicalize path and resolve symlinks before checking restricted system prefixes.
 	cleanTarget, err := filepath.Abs(filepath.Clean(target))

@@ -243,3 +243,18 @@ func TestExponentialBackoff_DoublesAndCapsAt60s(t *testing.T) {
 		}
 	}
 }
+
+func TestPusherClient_ReadOnlyMode(t *testing.T) {
+	t.Setenv("AGENT_READ_ONLY", "true")
+	client := NewPusherClient("ws://localhost", "http://localhost", "token", "srv", "")
+	if !client.ReadOnly {
+		t.Errorf("Expected client.ReadOnly to be true when AGENT_READ_ONLY=true")
+	}
+
+	if !isReadOnlyFileAction("read-file") || !isReadOnlyFileAction("list-directory") {
+		t.Errorf("Expected read-file and list-directory to be allowed in ReadOnly mode")
+	}
+	if isReadOnlyFileAction("write-file") || isReadOnlyFileAction("delete-path") || isReadOnlyFileAction("chmod-path") {
+		t.Errorf("Expected write-file, delete-path, and chmod-path to be rejected in ReadOnly mode")
+	}
+}

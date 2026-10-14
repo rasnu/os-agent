@@ -96,6 +96,7 @@ func runAgent(args []string, shutdown chan struct{}) error {
 	tokenFlag := fs.String("token", "", "Agent Authentication Token")
 	serverIdFlag := fs.String("server-id", "", "ID of the Server in RasnuOS")
 	tlsPinFlag := fs.String("tls-pin", "", "Comma-separated list of SHA-256 SPKI hashes for TLS certificate pinning (falls back to TLS_PIN env var)")
+	readOnlyFlag := fs.Bool("read-only", false, "Run agent in read-only mode, disabling shell execution, PTY, and file/service mutations (falls back to AGENT_READ_ONLY=true)")
 	versionFlag := fs.Bool("version", false, "Print version and exit")
 	keyInfoFlag := fs.Bool("key-info", false, "Print update public key status and exit")
 
@@ -143,6 +144,12 @@ func runAgent(args []string, shutdown chan struct{}) error {
 	}
 
 	client := NewPusherClient(serverURL, apiURL, token, serverId, tlsPin)
+	if *readOnlyFlag {
+		client.ReadOnly = true
+	}
+	if client.ReadOnly {
+		log.Printf("Agent is running in READ-ONLY mode (--read-only / AGENT_READ_ONLY=true).")
+	}
 	go client.ConnectAndMonitor(shutdown)
 	go client.StartMetricsEngine(shutdown)
 	go CleanupIdleSessions(shutdown)

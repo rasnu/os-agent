@@ -71,8 +71,11 @@ func (a *MacOSAdapter) KillProcess(pid string) (string, error) {
 }
 
 func (a *MacOSAdapter) WriteCronJobs(content string) error {
+	existingOut, _ := exec.Command("crontab", "-l").Output()
+	finalCron := MergeManagedCrontab(string(existingOut), content)
+
 	cmd := exec.Command("crontab", "-")
-	cmd.Stdin = strings.NewReader(content)
+	cmd.Stdin = strings.NewReader(finalCron)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("WriteCronJobs: crontab error: %w — %s", err, string(out))

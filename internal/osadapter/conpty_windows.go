@@ -15,14 +15,19 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+var (
+	modkernel32                   = windows.NewLazySystemDLL("kernel32.dll")
+	procUpdateProcThreadAttribute = modkernel32.NewProc("UpdateProcThreadAttribute")
+)
+
 // WindowsConPTY wraps a native Windows 10 1809+ / Server 2019+ Pseudo Console (ConPTY)
 // supporting true terminal resizing (ResizePseudoConsole) and VT/ANSI sequences.
 type WindowsConPTY struct {
 	mu      sync.Mutex
 	hpc     windows.Handle
 	pi      windows.ProcessInformation
-	inPipe  *os.File
-	outPipe *os.File
+	inPipe  windows.Handle
+	outPipe windows.Handle
 	closed  bool
 }
 
@@ -70,17 +75,22 @@ func startWindowsConPTY(cols, rows uint16) (PTY, error) {
 	defer attrList.Delete()
 
 	// Win32 UpdateProcThreadAttribute expects the HPCON handle value itself (not &hpc)
-	// in lpValue for PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE.
-	hpcPtr := *(*unsafe.Pointer)(unsafe.Pointer(&hpc))
-	if err := attrList.Update(
-		windows.PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
-		hpcPtr,
+	// in lpValue for PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE. Calling the proc directly
+	// with uintptr(hpc) avoids storing a non-heap handle in attrList's []unsafe.Pointer.
+	r1, _, e1 := procUpdateProcThreadAttribute.Call(
+		uintptr(unsafe.Pointer(attrList.List())),
+		0,
+		uintptr(windows.PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE),
+		uintptr(hpc),
 		unsafe.Sizeof(hpc),
-	); err != nil {
+		0,
+		0,
+	)
+	if r1 == 0 {
 		windows.ClosePseudoConsole(hpc)
 		_ = windows.CloseHandle(ptyInWrite)
 		_ = windows.CloseHandle(ptyOutRead)
-		return nil, err
+		return nil, e1
 	}
 
 	siEx := windows.StartupInfoEx{
@@ -94,12 +104,17 @@ func startWindowsConPTY(cols, rows uint16) (PTY, error) {
 	if sysRoot == "" {
 		sysRoot = `C:\Windows`
 	}
-	cmdPath := filepath.Join(sysRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
-	if _, err := os.Stat(cmdPath); err != nil {
-		cmdPath = filepath.Join(sysRoot, "System32", "cmd.exe")
+	psPath := filepath.Join(sysRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+	var commandLineStr string
+	if _, err := os.Stat(psPath); err == nil {
+		// Unload PSReadLine in Session 0 service context so PowerShell uses native ConPTY
+		// console input without blocking on ANSI DSR (\x1b[6n) cursor queries.
+		commandLineStr = `"` + psPath + `" -NoLogo -NoExit -Command "Remove-Module PSReadLine -ErrorAction SilentlyContinue"`
+	} else {
+		commandLineStr = filepath.Join(sysRoot, "System32", "cmd.exe")
 	}
 
-	cmdLine, err := windows.UTF16PtrFromString(cmdPath)
+	cmdLine, err := windows.UTF16PtrFromString(commandLineStr)
 	if err != nil {
 		windows.ClosePseudoConsole(hpc)
 		_ = windows.CloseHandle(ptyInWrite)
@@ -130,17 +145,33 @@ func startWindowsConPTY(cols, rows uint16) (PTY, error) {
 	return &WindowsConPTY{
 		hpc:     hpc,
 		pi:      pi,
-		inPipe:  os.NewFile(uintptr(ptyInWrite), "conpty-in"),
-		outPipe: os.NewFile(uintptr(ptyOutRead), "conpty-out"),
+		inPipe:  ptyInWrite,
+		outPipe: ptyOutRead,
 	}, nil
 }
 
 func (c *WindowsConPTY) Read(p []byte) (int, error) {
-	return c.outPipe.Read(p)
+	c.mu.Lock()
+	h := c.outPipe
+	c.mu.Unlock()
+	if h == 0 {
+		return 0, os.ErrClosed
+	}
+	var done uint32
+	err := windows.ReadFile(h, p, &done, nil)
+	return int(done), err
 }
 
 func (c *WindowsConPTY) Write(p []byte) (int, error) {
-	return c.inPipe.Write(p)
+	c.mu.Lock()
+	h := c.inPipe
+	c.mu.Unlock()
+	if h == 0 {
+		return 0, os.ErrClosed
+	}
+	var done uint32
+	err := windows.WriteFile(h, p, &done, nil)
+	return int(done), err
 }
 
 func (c *WindowsConPTY) Resize(cols, rows uint16) error {
@@ -169,8 +200,15 @@ func (c *WindowsConPTY) Close() error {
 		windows.ClosePseudoConsole(c.hpc)
 		c.hpc = 0
 	}
-	_ = c.inPipe.Close()
-	err := c.outPipe.Close()
+	if c.inPipe != 0 {
+		_ = windows.CloseHandle(c.inPipe)
+		c.inPipe = 0
+	}
+	var err error
+	if c.outPipe != 0 {
+		err = windows.CloseHandle(c.outPipe)
+		c.outPipe = 0
+	}
 	if c.pi.Thread != 0 {
 		_ = windows.CloseHandle(c.pi.Thread)
 		c.pi.Thread = 0

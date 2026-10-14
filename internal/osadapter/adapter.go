@@ -6,6 +6,7 @@ package osadapter
 import (
 	"context"
 	"os/exec"
+	"strings"
 	"sync"
 )
 
@@ -91,4 +92,53 @@ func SetAdapter(a OSAdapter) {
 	adapterMutex.Lock()
 	defer adapterMutex.Unlock()
 	currentAdapter = a
+}
+
+// MergeManagedCrontab preserves existing user crontab entries outside the
+// RasnuOS-managed block markers while updating or removing the managed section.
+func MergeManagedCrontab(existing, managedContent string) string {
+	const beginMarker = "# BEGIN RASNUOS MANAGED CRON JOBS"
+	const endMarker = "# END RASNUOS MANAGED CRON JOBS"
+
+	var preserved []string
+	inManagedBlock := false
+	for _, line := range strings.Split(existing, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == beginMarker {
+			inManagedBlock = true
+			continue
+		}
+		if trimmed == endMarker {
+			inManagedBlock = false
+			continue
+		}
+		if !inManagedBlock {
+			preserved = append(preserved, line)
+		}
+	}
+
+	base := strings.TrimRight(strings.Join(preserved, "\n"), "\n")
+	trimmedContent := strings.TrimSpace(managedContent)
+	if trimmedContent != "" {
+		var finalCron string
+		if base != "" {
+			finalCron = base + "\n"
+		}
+		return finalCron + beginMarker + "\n" + trimmedContent + "\n" + endMarker + "\n"
+	}
+	if base != "" {
+		return base + "\n"
+	}
+	return ""
+}
+
+// HasExecutableCronLines returns true if content has at least one non-empty, non-comment line.
+func HasExecutableCronLines(content string) bool {
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+			return true
+		}
+	}
+	return false
 }
