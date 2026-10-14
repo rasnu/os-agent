@@ -57,6 +57,7 @@ type PusherClient struct {
 	writeMutex       sync.Mutex
 	wg               sync.WaitGroup
 	activeOps        int64
+	updateMu         sync.Mutex
 	activeCommands   map[string]context.CancelFunc
 	cmdMutex         sync.Mutex
 	cmdSemaphore     chan struct{}
@@ -158,6 +159,7 @@ func (c *PusherClient) ConnectAndMonitor(shutdownChan chan struct{}) {
 		err := c.Connect()
 		if err == nil {
 			backoff = 1 * time.Second
+			go func() { _ = c.sendHeartbeatWithStatus() }()
 			c.monitorConnection(shutdownChan)
 		} else {
 			log.Printf("Connection error: %v", err)
@@ -917,6 +919,8 @@ func (c *PusherClient) sendHeartbeatWithStatus() error {
 		"os_type":          runtime.GOOS,
 		"cpu_arch":         runtime.GOARCH,
 		"machine_id":       osadapter.Current().GetMachineID(),
+		"active_commands":  c.ActiveCommandCount(),
+		"active_terminals": ActiveTerminalSessionCount(),
 	})
 	if err != nil {
 		log.Printf("Error marshaling heartbeat: %v", err)

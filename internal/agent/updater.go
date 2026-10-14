@@ -39,6 +39,12 @@ func getAgentPublicKey() (ed25519.PublicKey, error) {
 }
 
 func (c *PusherClient) executeSelfUpdate(downloadUrl, signatureBase64, pipelineId, stepId string) {
+	if !c.updateMu.TryLock() {
+		log.Printf("Self-update already in progress; skipping duplicate update request.")
+		return
+	}
+	defer c.updateMu.Unlock()
+
 	log.Printf("Starting self-update from %s", downloadUrl)
 
 	pubKey, err := getAgentPublicKey()
@@ -63,6 +69,7 @@ func (c *PusherClient) executeSelfUpdate(downloadUrl, signatureBase64, pipelineI
 		c.reportUpdateFailure(pipelineId, stepId, fmt.Sprintf("Failed to get executable path: %v", err))
 		return
 	}
+	executablePath = strings.TrimSuffix(executablePath, " (deleted)")
 
 	tempPath := executablePath + ".tmp"
 	err = downloadFile(downloadUrl, tempPath)
@@ -91,19 +98,21 @@ func (c *PusherClient) executeSelfUpdate(downloadUrl, signatureBase64, pipelineI
 		return
 	}
 
-	err = osadapter.Current().VerifyBinary(tempPath)
+	adapter := osadapter.Current()
+
+	err = adapter.VerifyBinary(tempPath)
 	if err != nil {
 		c.reportUpdateFailure(pipelineId, stepId, fmt.Sprintf("Failed to verify downloaded binary: %v", err))
 		return
 	}
 
-	err = osadapter.Current().ReplaceBinary(tempPath, executablePath)
+	err = adapter.ReplaceBinary(tempPath, executablePath)
 	if err != nil {
 		c.reportUpdateFailure(pipelineId, stepId, fmt.Sprintf("Failed to replace binary: %v", err))
 		return
 	}
 
-	if err := osadapter.Current().VerifyBinary(executablePath); err != nil {
+	if err := adapter.VerifyBinary(executablePath); err != nil {
 		rollbackUpdate(executablePath)
 		c.reportUpdateFailure(pipelineId, stepId, fmt.Sprintf("Post-replace verification failed (rolled back to previous binary): %v", err))
 		return
@@ -116,11 +125,12 @@ func (c *PusherClient) executeSelfUpdate(downloadUrl, signatureBase64, pipelineI
 		c.sendCompletion(pipelineId, stepId, true, "Agent updated successfully. Restarting...")
 	}
 
-	go func() {
+	go func(a osadapter.OSAdapter) {
 		time.Sleep(2 * time.Second)
+		c.WaitUntilIdle(5 * time.Minute)
 		log.Printf("Restarting agent using OS-specific adapter...")
-		osadapter.Current().RestartAgent()
-	}()
+		_ = a.RestartAgent()
+	}(adapter)
 }
 
 func rollbackUpdate(executablePath string) {
