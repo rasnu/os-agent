@@ -68,7 +68,7 @@ Every official `rasnuos-agent` binary published on [GitHub Releases](https://git
 
 - **Official Production Ed25519 Public Key (Base64):**
   ```text
-  GJkzaBMAhuYIMYR8UiDyC49nr2Uhz4fh0A9vOkTyE/E=
+  KV6I4qHywRL/KPqIWD80LIjmCT/ajd5Mw3Cq+am43UA=
   ```
 
 To verify a downloaded binary before deploying it to production:
@@ -79,7 +79,7 @@ sha256sum -c SHA256SUMS.txt --ignore-missing
 
 # 2. Verify Ed25519 cryptographic signature
 go run ./cmd/signer verify \
-  -key "GJkzaBMAhuYIMYR8UiDyC49nr2Uhz4fh0A9vOkTyE/E=" \
+  -key "KV6I4qHywRL/KPqIWD80LIjmCT/ajd5Mw3Cq+am43UA=" \
   -file ./rasnuos-agent-linux-amd64 \
   -sig ./rasnuos-agent-linux-amd64.sig
 ```

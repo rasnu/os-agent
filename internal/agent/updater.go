@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"rasnuos-agent/internal/audit"
+	"rasnuos-agent/internal/buildinfo"
 	"rasnuos-agent/internal/osadapter"
 	"rasnuos-agent/internal/transport"
 )
@@ -38,14 +39,21 @@ func getAgentPublicKey() (ed25519.PublicKey, error) {
 	return ed25519.PublicKey(pubKeyBytes), nil
 }
 
-func (c *PusherClient) executeSelfUpdate(downloadUrl, signatureBase64, pipelineId, stepId string) {
+func (c *PusherClient) executeSelfUpdate(downloadUrl, signatureBase64, targetVersion, pipelineId, stepId string) {
 	if !c.updateMu.TryLock() {
 		log.Printf("Self-update already in progress; skipping duplicate update request.")
 		return
 	}
 	defer c.updateMu.Unlock()
 
-	log.Printf("Starting self-update from %s", downloadUrl)
+	log.Printf("Starting self-update from %s (target version: %s)", downloadUrl, targetVersion)
+
+	if targetVersion != "" {
+		if err := buildinfo.ValidateUpdateVersion(buildinfo.Version, targetVersion); err != nil {
+			c.reportUpdateFailure(pipelineId, stepId, fmt.Sprintf("SECURITY ALERT: %v", err))
+			return
+		}
+	}
 
 	pubKey, err := getAgentPublicKey()
 	if err != nil {

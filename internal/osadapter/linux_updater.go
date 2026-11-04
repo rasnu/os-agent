@@ -7,13 +7,20 @@
 package osadapter
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
+
+	"rasnuos-agent/internal/buildinfo"
 )
 
 func (a *LinuxAdapter) VerifyBinary(path string) error {
-	return exec.Command(path, "--version").Run()
+	out, err := exec.Command(path, "--version").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("binary execution verification failed: %w", err)
+	}
+	return buildinfo.ValidateUpdateVersion(buildinfo.Version, string(out))
 }
 
 func (a *LinuxAdapter) ReplaceBinary(tempPath, currentPath string) error {
