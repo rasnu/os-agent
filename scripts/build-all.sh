@@ -17,7 +17,7 @@ BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 KEY_DIR="${KEY_DIR:-.agent_update_keys}"
 
 # Official RasnuOS production public key used when CI secrets are not set.
-DEFAULT_PRODUCTION_PUBLIC_KEY="GJkzaBMAhuYIMYR8UiDyC49nr2Uhz4fh0A9vOkTyE/E="
+DEFAULT_PRODUCTION_PUBLIC_KEY="KV6I4qHywRL/KPqIWD80LIjmCT/ajd5Mw3Cq+am43UA="
 
 if [ -z "${AGENT_PUBLIC_KEY}" ] && [ -f "${KEY_DIR}/agent_ed25519_public.pub" ]; then
     AGENT_PUBLIC_KEY=$(cat "${KEY_DIR}/agent_ed25519_public.pub" | tr -d ' \n\r')

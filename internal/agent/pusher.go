@@ -387,9 +387,10 @@ func (c *PusherClient) readPump() {
 			}
 
 			signature := getString(payload, "signature")
+			targetVersion := getString(payload, "version")
 
-			log.Printf("Received self-update command, downloading from %s", downloadUrl)
-			c.runCommand(func() { c.executeSelfUpdate(downloadUrl, signature, pipelineId, stepId) })
+			log.Printf("Received self-update command, downloading from %s (target version: %s)", downloadUrl, targetVersion)
+			c.runCommand(func() { c.executeSelfUpdate(downloadUrl, signature, targetVersion, pipelineId, stepId) })
 
 		case "ExecuteCommand":
 			payload := parseEventData("ExecuteCommand", pm.Data)
@@ -667,7 +668,8 @@ func (c *PusherClient) handleAgentCommand(command string, args map[string]interf
 			break
 		}
 		signature := getString(args, "signature")
-		c.runCommand(func() { c.executeSelfUpdate(downloadUrl, signature, pipelineId, stepId) })
+		targetVersion := getString(args, "version")
+		c.runCommand(func() { c.executeSelfUpdate(downloadUrl, signature, targetVersion, pipelineId, stepId) })
 
 	case "execute-command":
 		cmdStr := getString(args, "command")

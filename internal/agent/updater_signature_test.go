@@ -57,7 +57,7 @@ func TestExecuteSelfUpdate_WithValidSignature(t *testing.T) {
 	AgentPublicKeyBase64 = base64.StdEncoding.EncodeToString(pubKey)
 	defer func() { AgentPublicKeyBase64 = originalKey }()
 
-	client.executeSelfUpdate(ts.URL, signatureBase64, "pipe-1", "step-1")
+	client.executeSelfUpdate(ts.URL, signatureBase64, "", "pipe-1", "step-1")
 	time.Sleep(100 * time.Millisecond)
 
 	if !replaceCalled {
@@ -105,7 +105,7 @@ func TestExecuteSelfUpdate_WithInvalidSignature(t *testing.T) {
 	AgentPublicKeyBase64 = base64.StdEncoding.EncodeToString(pubKey)
 	defer func() { AgentPublicKeyBase64 = originalKey }()
 
-	client.executeSelfUpdate(ts.URL, signatureBase64, "pipe-2", "step-2")
+	client.executeSelfUpdate(ts.URL, signatureBase64, "", "pipe-2", "step-2")
 	time.Sleep(100 * time.Millisecond)
 
 	if replaceCalled {
@@ -148,7 +148,7 @@ func TestExecuteSelfUpdate_ProductionFailsClosed(t *testing.T) {
 	AgentPublicKeyBase64 = base64.StdEncoding.EncodeToString(pubKey)
 	defer func() { AgentPublicKeyBase64 = originalKey }()
 
-	client.executeSelfUpdate(ts.URL, "", "pipe-3", "step-3")
+	client.executeSelfUpdate(ts.URL, "", "", "pipe-3", "step-3")
 	time.Sleep(100 * time.Millisecond)
 
 	if replaceCalled {

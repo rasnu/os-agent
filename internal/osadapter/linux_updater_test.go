@@ -36,6 +36,24 @@ func TestLinuxAdapter_VerifyBinary(t *testing.T) {
 	if err == nil {
 		t.Errorf("VerifyBinary succeeded on failing script, expected error")
 	}
+
+	downgradeScriptPath := filepath.Join(tempDir, "downgrade.sh")
+	downgradeScriptContent := "#!/bin/sh\necho 'rasnuos-agent 0.5.0'\nexit 0\n"
+	os.WriteFile(downgradeScriptPath, []byte(downgradeScriptContent), 0755)
+
+	err = adapter.VerifyBinary(downgradeScriptPath)
+	if err == nil {
+		t.Errorf("VerifyBinary succeeded on downgrade script, expected downgrade rejection error")
+	}
+
+	upgradeScriptPath := filepath.Join(tempDir, "upgrade.sh")
+	upgradeScriptContent := "#!/bin/sh\necho 'rasnuos-agent 2.0.0'\nexit 0\n"
+	os.WriteFile(upgradeScriptPath, []byte(upgradeScriptContent), 0755)
+
+	err = adapter.VerifyBinary(upgradeScriptPath)
+	if err != nil {
+		t.Errorf("VerifyBinary failed on valid upgrade script: %v", err)
+	}
 }
 
 func TestLinuxAdapter_ReplaceBinary(t *testing.T) {
